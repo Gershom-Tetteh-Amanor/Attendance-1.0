@@ -1,0 +1,2035 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="description" content="Smart QR code attendance tracking for universities"/>
+  <title>QR Attendance System</title>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#534ab7"/>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- QR Code -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- SheetJS (Excel export) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1a1a18;min-height:100vh;font-size:15px}
+.view{display:none;min-height:100vh}.view.active{display:block}
+.view.center.active{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px}
+.topbar{display:flex;align-items:center;gap:10px;padding:13px 22px;background:#fff;border-bottom:1px solid #e5e3da;position:sticky;top:0;z-index:200}
+.topbar-icon{font-size:20px;flex-shrink:0}.topbar-title{font-size:15px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar-user{font-size:12px;color:#888;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpill{font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.rpill.lec{background:#f0effe;color:#534ab7;border:1px solid #afa9ec}
+.rpill.stu{background:#e1f5ee;color:#0f6e56;border:1px solid #5dcaa5}
+.rpill.sadm{background:#fcebeb;color:#791f1f;border:1px solid #f09595}
+.rpill.cadm{background:#faeeda;color:#633806;border:1px solid #ef9f27}
+.topbar-btn{font-size:12px;color:#888;background:none;border:none;cursor:pointer;padding:5px 10px;border-radius:6px;white-space:nowrap}
+.topbar-btn:hover{background:#f1efe8;color:#333}
+.tabs{display:flex;background:#fff;border-bottom:1px solid #e5e3da;padding:0 18px;overflow-x:auto}
+.tab{padding:11px 13px;font-size:13px;font-weight:500;color:#888;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;flex-shrink:0;transition:color .15s;user-select:none}
+.tab:hover{color:#444}.tab.active{color:#534ab7;border-bottom-color:#534ab7}
+.tab-page{display:none}.tab-page.active{display:block}
+.pg{max-width:680px;margin:0 auto;padding:28px 20px}
+@media(max-width:500px){.pg{padding:18px 13px}}
+h2{font-size:21px;font-weight:500;margin-bottom:5px}h3{font-size:15px;font-weight:500;margin-bottom:8px}
+.sub{font-size:13px;color:#666;margin-bottom:22px;line-height:1.6}
+.auth-card{background:#fff;border:1px solid #e5e3da;border-radius:16px;padding:34px 38px;width:100%;max-width:440px}
+@media(max-width:480px){.auth-card{padding:24px 17px}}
+.auth-logo{font-size:40px;text-align:center;margin-bottom:11px}
+.auth-title{font-size:20px;font-weight:500;text-align:center;margin-bottom:4px}
+.auth-sub{font-size:13px;color:#888;text-align:center;margin-bottom:22px;line-height:1.5}
+.auth-link{font-size:13px;text-align:center;margin-top:12px;color:#666}
+.auth-link a{color:#534ab7;cursor:pointer;font-weight:500}
+.field{margin-bottom:12px}
+label{display:block;font-size:12px;font-weight:500;margin-bottom:4px;color:#444}
+input,select{width:100%;padding:10px 12px;border:1px solid #d5d3ca;border-radius:8px;font-size:14px;background:#fff;color:#1a1a18;transition:border-color .15s}
+input:focus,select:focus{outline:none;border-color:#7f77dd;box-shadow:0 0 0 3px rgba(83,74,183,.07)}
+input.err{border-color:#e24b4a!important;background:#fff8f8}
+input[readonly]{background:#f5f4f0;color:#888}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:460px){.two-col{grid-template-columns:1fr}}
+.pass-wrap{position:relative}.pass-wrap input{padding-right:40px}
+.eye{position:absolute;right:11px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:15px;color:#aaa;line-height:1}
+.sl-row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sl-row>label{margin:0;white-space:nowrap;font-size:12px;font-weight:500;color:#444;min-width:60px}
+.sl-row input[type=range]{flex:1;accent-color:#7f77dd}
+.sval{font-size:12px;color:#7f77dd;font-weight:500;min-width:58px;text-align:right}
+.tog-wrap{display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer;user-select:none}
+.tog-wrap>label{font-size:12px;font-weight:500;color:#444;margin:0;cursor:pointer}
+.tog{position:relative;width:36px;height:20px;background:#d5d3ca;border-radius:10px;transition:background .2s;flex-shrink:0}
+.tog.on{background:#534ab7}.tok{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tog.on .tok{transform:translateX(16px)}
+.btn{display:block;width:100%;padding:11px;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s;text-align:center}
+.btn:hover:not(:disabled){opacity:.87}.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:#534ab7;color:#fff}.btn-danger{background:#e24b4a;color:#fff}
+.btn-secondary{background:#e8e6f0;color:#534ab7}.btn-teal{background:#1d9e75;color:#fff}
+.btn-amber{background:#ba7517;color:#fff}.btn-dark{background:#1a1a18;color:#fff}
+.btn-sm{padding:6px 12px;font-size:12px;width:auto;display:inline-block;border-radius:6px}
+.row-btns{display:flex;gap:8px;margin-bottom:11px}.row-btns>.btn{flex:1}
+.strip{border-radius:9px;padding:12px 14px;margin-bottom:13px;font-size:13px;line-height:1.8}
+.strip.purple{background:#f0effe;border:1px solid #afa9ec}.strip.purple strong{color:#3c3489}
+.strip.teal{background:#e1f5ee;border:1px solid #5dcaa5}.strip.teal strong{color:#085041}
+.strip.gray{background:#f1efe8;border:1px solid #d3d1c7}.strip.gray strong{color:#5f5e5a}
+.strip.amber{background:#faeeda;border:1px solid #ef9f27}.strip.amber strong{color:#633806}
+.strip.green{background:#eaf3de;border:1px solid #97c459}.strip.green strong{color:#3b6d11}
+.strip.red{background:#fcebeb;border:1px solid #f09595}.strip.red strong{color:#791f1f}
+.alert{border-radius:8px;padding:10px 13px;font-size:13px;margin-bottom:12px;display:none;line-height:1.5}
+.alert.show{display:block}
+.alert.err{background:#fcebeb;border:1px solid #f09595;color:#791f1f}
+.alert.ok{background:#eaf3de;border:1px solid #97c459;color:#3b6d11}
+.alert.warn{background:#faeeda;border:1px solid #ef9f27;color:#633806}
+.alert.info{background:#f0effe;border:1px solid #afa9ec;color:#3c3489}
+.badge{background:#534ab7;color:#fff;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;display:inline-block}
+.badge-red{background:#e24b4a;color:#fff;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;display:inline-block}
+.badge-amber{background:#ba7517;color:#fff;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;display:inline-block}
+.pill{font-size:11px;padding:2px 6px;border-radius:12px;white-space:nowrap;display:inline-block}
+.pill.green{background:#eaf3de;color:#3b6d11}.pill.gray{background:#f1efe8;color:#888}
+.pill.red{background:#fcebeb;color:#791f1f}.pill.amber{background:#faeeda;color:#633806}
+.pill.blue{background:#e6f1fb;color:#0c447c}.pill.purple{background:#f0effe;color:#534ab7}
+.sec-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.spill{font-size:11px;font-weight:500;padding:3px 8px;border-radius:20px}
+.spill.on{background:#eaf3de;color:#3b6d11;border:1px solid #c0dd97}
+.spill.off{background:#f1efe8;color:#888;border:1px solid #d3d1c7}
+.qr-wrap{text-align:center;margin:18px 0 13px}
+#qr-box{display:inline-block;background:#fff;padding:16px;border-radius:13px;border:1px solid #e5e3da}
+#qr-box canvas,#qr-box img{display:block}
+.qr-btns{display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.countdown{font-size:15px;font-weight:500;margin-top:7px}
+.countdown.ok{color:#3b6d11}.countdown.warn{color:#ba7517}.countdown.exp{color:#a32d2d}
+.list-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.att-item{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fff;border:1px solid #e5e3da;border-radius:8px;margin-bottom:4px;font-size:13px;flex-wrap:wrap}
+.att-dot{width:8px;height:8px;border-radius:50%;background:#639922;flex-shrink:0}
+.att-name{font-weight:500;flex:1;min-width:100px}.att-sid{color:#888;font-size:12px;font-family:monospace}
+.att-time{font-size:12px;color:#aaa;margin-left:auto}
+.att-empty{text-align:center;color:#aaa;font-size:13px;padding:28px 0}
+.blk-item{display:flex;align-items:flex-start;gap:8px;padding:8px 12px;background:#fff8f8;border:1px solid #f7c1c1;border-radius:8px;margin-bottom:4px;font-size:12px;color:#791f1f}
+.blk-item>span:first-child{flex:1;word-break:break-word}
+.divider{border:none;border-top:1px solid #e5e3da;margin:18px 0}
+.sess-card{background:#fff;border:1px solid #e5e3da;border-radius:10px;padding:14px;margin-bottom:10px}
+.sc-hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.sc-title{font-size:14px;font-weight:500}.sc-meta{font-size:12px;color:#888;margin-top:2px;line-height:1.6}
+.sc-actions{display:flex;gap:5px;flex-shrink:0}
+.rec-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #f1efe8;font-size:13px}
+.rec-name{flex:1;min-width:90px}.rec-sid{font-size:12px;color:#888;font-family:monospace}
+.rec-time{font-size:12px;color:#aaa;white-space:nowrap;margin-left:auto}
+.no-rec{text-align:center;color:#aaa;font-size:13px;padding:38px 0}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid #e5e3da}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;padding:8px 11px;background:#f5f4f0;border-bottom:2px solid #e5e3da;font-size:12px;font-weight:500;color:#666;white-space:nowrap}
+.tbl td{padding:8px 11px;border-bottom:1px solid #f1efe8;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}.tbl tr:hover td{background:#fafaf8}
+.paginator{display:flex;align-items:center;gap:8px;margin-top:11px;font-size:13px;color:#666;flex-wrap:wrap}
+.paginator button{padding:5px 11px;font-size:12px;background:#fff;border:1px solid #d5d3ca;border-radius:6px;cursor:pointer}
+.paginator button:disabled{opacity:.4;cursor:not-allowed}
+/* Landing */
+.land-logo{font-size:52px;margin-bottom:12px}
+.land-title{font-size:26px;font-weight:500;margin-bottom:5px;text-align:center}
+.land-sub{font-size:14px;color:#888;margin-bottom:40px;text-align:center}
+.role-cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.role-card{background:#fff;border:1px solid #e5e3da;border-radius:14px;padding:26px 32px;text-align:center;cursor:pointer;width:178px;transition:border-color .2s,box-shadow .2s}
+.role-card:hover{border-color:#7f77dd;box-shadow:0 5px 20px rgba(83,74,183,.11)}
+.role-icon{font-size:36px;margin-bottom:10px}.role-name{font-size:15px;font-weight:500;margin-bottom:5px}
+.role-desc{font-size:12px;color:#888;line-height:1.5}
+/* Banners */
+.demo-bar{display:none;background:#faeeda;border-bottom:2px solid #ef9f27;padding:9px 18px;font-size:13px;color:#633806;text-align:center}
+.demo-bar.show{display:block}
+.offline-bar{display:none;background:#fcebeb;border-bottom:1px solid #f09595;padding:8px 18px;font-size:13px;color:#791f1f;text-align:center;position:sticky;top:0;z-index:300}
+.offline-bar.show{display:block}
+/* Lecturer ID box */
+.lecid-box{background:linear-gradient(135deg,#534ab7,#7f77dd);color:#fff;border-radius:10px;padding:13px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.lecid-lbl{font-size:11px;opacity:.8;margin-bottom:2px}.lecid-val{font-size:21px;font-weight:600;font-family:monospace;letter-spacing:.05em}
+/* ID display for admin */
+.uid-display{background:#1a1a18;color:#fff;border-radius:10px;padding:16px;text-align:center;margin:10px 0}
+.uid-label{font-size:11px;opacity:.7;margin-bottom:7px}
+.uid-code{font-size:22px;font-weight:700;font-family:monospace;letter-spacing:.1em;color:#5dcaa5;word-break:break-all}
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:5px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+/* Student states */
+.state-blk{display:none;text-align:center;padding:65px 20px}
+.state-blk.show{display:block}
+.state-icon{font-size:52px;margin-bottom:13px}
+.state-title{font-size:20px;font-weight:500;margin-bottom:7px}
+.state-msg{font-size:13px;color:#888;line-height:1.7;max-width:340px;margin:0 auto}
+.stu-sess{background:#fff;border:1px solid #e5e3da;border-radius:12px;padding:14px 16px;margin-bottom:18px}
+.stu-code{font-size:24px;font-weight:500;color:#534ab7}
+.stu-name{font-size:14px;color:#444;margin-top:3px}
+.stu-meta{font-size:13px;color:#888;margin-top:7px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.fp-box{background:#f0effe;border:1px solid #afa9ec;border-radius:8px;padding:9px 12px;margin-bottom:11px}
+.fp-lbl{font-size:11px;font-weight:500;color:#3c3489;margin-bottom:2px}
+.fp-val{font-size:11px;font-family:monospace;color:#534ab7;letter-spacing:.04em;word-break:break-all}
+.loc-status{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;font-size:13px;margin-bottom:10px}
+.loc-status.idle{background:#f1efe8;color:#888}.loc-status.busy{background:#faeeda;color:#854f0b}
+.loc-status.ok{background:#eaf3de;color:#3b6d11}
+.ls-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+.loc-status.busy .ls-dot{animation:pulse .8s infinite}
+.result-box{border-radius:9px;padding:11px 13px;font-size:13px;margin-bottom:10px;display:none;line-height:1.6}
+.result-box.show{display:block}
+.result-ok{background:#eaf3de;border:1px solid #97c459;color:#3b6d11}
+.result-err{background:#fcebeb;border:1px solid #f09595;color:#791f1f}
+.info-card{background:#fff;border:1px solid #e5e3da;border-radius:12px;padding:14px}
+.info-card p{font-size:13px;font-weight:500;margin-bottom:6px;color:#444}
+.info-card ul{font-size:13px;color:#666;line-height:1.9;padding-left:16px}
+/* Approval items */
+.appr-item{background:#fff;border:1px solid #e5e3da;border-radius:8px;padding:11px 13px;margin-bottom:7px;font-size:13px}
+.appr-hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px}
+.appr-actions{display:flex;gap:6px;margin-top:7px}
+/* Notification dot */
+.notif-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#e24b4a;margin-left:4px;vertical-align:middle}
+  </style>
+</head>
+<body>
+
+<div class="demo-bar" id="demo-bar">
+  ⚠️ <strong>Demo mode</strong> — Firebase not configured. Real-time cross-device sync requires Firebase setup. See README.
+</div>
+<div class="offline-bar" id="offline-bar">📡 Offline — check-ins will sync when reconnected.</div>
+
+<!-- ═══════ LANDING ═══════ -->
+<div class="view center" id="view-landing">
+  <div class="land-logo">🎓</div>
+  <div class="land-title">QR Attendance System</div>
+  <div class="land-sub">Smart, secure attendance for your institution</div>
+  <div class="role-cards">
+    <div class="role-card" onclick="goTo('lec-login')">
+      <div class="role-icon">👨‍🏫</div><div class="role-name">Lecturer</div>
+      <div class="role-desc">Sign in to manage sessions</div>
+    </div>
+    <div class="role-card" onclick="goTo('stu-scan')">
+      <div class="role-icon">🎒</div><div class="role-name">Student</div>
+      <div class="role-desc">Scan QR code to check in</div>
+    </div>
+    <div class="role-card" onclick="goTo('admin-login')" style="border-style:dashed">
+      <div class="role-icon">🔐</div><div class="role-name">Admin</div>
+      <div class="role-desc">Super admin &amp; co-admin portal</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ LECTURER LOGIN ═══════ -->
+<div class="view center" id="view-lec-login">
+  <div class="auth-card">
+    <div class="auth-logo">👨‍🏫</div>
+    <div class="auth-title">Lecturer Sign In</div>
+    <div class="auth-sub">Enter your email and password</div>
+    <div class="alert" id="ll-alert"></div>
+    <div class="field"><label>Email</label>
+      <input type="email" id="ll-email" placeholder="you@university.edu" autocomplete="email"/>
+    </div>
+    <div class="field"><label>Password</label>
+      <div class="pass-wrap">
+        <input type="password" id="ll-pass" placeholder="Password" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')lecLogin()"/>
+        <button class="eye" onclick="tgEye('ll-pass',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="ll-btn" onclick="lecLogin()">Sign in</button>
+    <div class="auth-link">No account? <a onclick="goTo('lec-signup')">Register with your Unique ID</a></div>
+    <div class="auth-link"><a onclick="goTo('landing')">← Back</a></div>
+  </div>
+</div>
+
+<!-- ═══════ LECTURER SIGNUP ═══════ -->
+<div class="view center" id="view-lec-signup">
+  <div class="auth-card" style="max-width:480px">
+    <div class="auth-logo">🔑</div>
+    <div class="auth-title">Lecturer Registration</div>
+    <div class="auth-sub">Enter the Unique ID your admin assigned to you</div>
+    <div class="alert" id="ls-alert"></div>
+    <div class="field">
+      <label>Unique Lecturer ID <span style="color:#a32d2d;font-size:10px">— from admin</span></label>
+      <input type="text" id="ls-uid" placeholder="e.g. LEC-X4K2M9P7QR"
+             oninput="this.value=this.value.toUpperCase()" style="font-family:monospace;letter-spacing:.05em"/>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Full name</label>
+        <input type="text" id="ls-name" placeholder="Dr. Ama Mensah" autocomplete="name"/>
+      </div>
+      <div class="field"><label>Department</label>
+        <input type="text" id="ls-dept" placeholder="Mathematics"/>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Institution</label>
+        <input type="text" id="ls-inst" placeholder="University of Ghana"/>
+      </div>
+      <div class="field"><label>Email</label>
+        <input type="email" id="ls-email" placeholder="you@university.edu" autocomplete="email"/>
+      </div>
+    </div>
+    <div class="field"><label>Password</label>
+      <div class="pass-wrap">
+        <input type="password" id="ls-pass" placeholder="Min 8 characters" autocomplete="new-password"/>
+        <button class="eye" onclick="tgEye('ls-pass',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div class="field"><label>Confirm password</label>
+      <input type="password" id="ls-pass2" placeholder="Repeat password" autocomplete="new-password"/>
+    </div>
+    <button class="btn btn-primary" id="ls-btn" onclick="lecSignup()">Create account</button>
+    <div class="auth-link">Already registered? <a onclick="goTo('lec-login')">Sign in</a></div>
+    <div class="auth-link"><a onclick="goTo('landing')">← Back</a></div>
+  </div>
+</div>
+
+<!-- ═══════ LECTURER DASHBOARD ═══════ -->
+<div class="view" id="view-lecturer">
+  <div class="topbar">
+    <span class="topbar-icon">👨‍🏫</span>
+    <span class="topbar-title">Lecturer Dashboard</span>
+    <span class="rpill lec">Lecturer</span>
+    <span class="topbar-user" id="lec-topbar-name"></span>
+    <button class="topbar-btn" onclick="lecLogout()">Sign out</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="lecTab('session')">Session</div>
+    <div class="tab" onclick="lecTab('records')">My Records</div>
+    <div class="tab" onclick="lecTab('combined')">Reports</div>
+  </div>
+  <!-- SESSION -->
+  <div class="tab-page active" id="lec-pg-session">
+    <div class="pg">
+      <div id="lec-setup">
+        <h2>Create a session</h2>
+        <p class="sub">Generate the QR code for your class. Location fence is on by default.</p>
+        <div class="lecid-box">
+          <div><div class="lecid-lbl">Your Lecturer ID</div>
+            <div class="lecid-val" id="lecid-val">—</div></div>
+          <span style="font-size:11px;opacity:.7;text-align:right">Auto-assigned<br/>unique ID</span>
+        </div>
+        <div class="two-col">
+          <div class="field"><label>Course code</label>
+            <input type="text" id="l-code" placeholder="MATH101" oninput="this.value=this.value.toUpperCase()"/>
+          </div>
+          <div class="field"><label>Course name</label>
+            <input type="text" id="l-course" placeholder="Mathematics"/>
+          </div>
+        </div>
+        <div class="field"><label>Lecturer name</label><input type="text" id="l-lecname" readonly/></div>
+        <div class="sl-row">
+          <label>Duration</label>
+          <input type="range" id="l-dur" min="5" max="90" value="60"
+                 oninput="Q('l-dur-val').textContent=fmtDur(+this.value)"/>
+          <span class="sval" id="l-dur-val">60 min</span>
+        </div>
+        <!-- Location fence ON by default -->
+        <div class="tog-wrap" onclick="toggleLoc()">
+          <div class="tog on" id="loc-tog"><div class="tok"></div></div>
+          <label>Location fence <span class="pill green" style="font-size:10px">ON by default</span></label>
+        </div>
+        <div id="radius-row">
+          <div class="sl-row">
+            <label>Max distance</label>
+            <input type="range" id="l-radius" min="20" max="500" value="100"
+                   oninput="Q('l-rad-val').textContent=this.value+'m'"/>
+            <span class="sval" id="l-rad-val">100m</span>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="gen-btn" onclick="startSession()">Generate QR code</button>
+      </div>
+      <div id="lec-active" style="display:none">
+        <h2>Session active</h2>
+        <p class="sub">Show the QR to your students — check-ins appear below in real time.</p>
+        <div class="strip purple">
+          <strong id="l-si-code"></strong> — <span id="l-si-course"></span><br/>
+          Lecturer: <strong id="l-si-lec"></strong> &nbsp;·&nbsp; Date: <strong id="l-si-date"></strong><br/>
+          Lecturer ID: <strong id="l-si-lecid"></strong> &nbsp;·&nbsp;
+          Session: <strong id="l-si-id"></strong> &nbsp;·&nbsp; <strong id="l-si-dur"></strong>
+          <div class="sec-pills" id="sec-pills"></div>
+        </div>
+        <div id="l-loc-card" class="strip teal">
+          <strong id="l-lfc-title">Acquiring location…</strong>
+          <div style="font-size:11px;font-family:monospace;color:#0f6e56;margin-top:2px" id="l-lfc-detail"></div>
+        </div>
+        <div class="qr-wrap">
+          <div id="qr-box"></div>
+          <div class="qr-btns">
+            <button class="btn btn-secondary btn-sm" onclick="downloadQR()">⬇ Download QR</button>
+          </div>
+          <div class="countdown ok" id="l-cd">—</div>
+          <p style="font-size:12px;color:#888;margin-top:6px">Students scan with their phone camera</p>
+        </div>
+        <div class="list-hdr">
+          <h3>Present students</h3><span class="badge" id="l-att-count">0</span>
+        </div>
+        <div id="l-att-list"><div class="att-empty">Waiting for students…</div></div>
+        <div style="margin-top:11px;display:flex;gap:7px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="csv-btn" onclick="exportSessionCSV(A.session.id)" style="display:none">Export CSV</button>
+        </div>
+        <div id="l-blk-wrap" style="display:none">
+          <hr class="divider"/>
+          <div class="list-hdr"><h3 style="color:#a32d2d">Blocked</h3><span class="badge-red" id="l-blk-count">0</span></div>
+          <div id="l-blk-list"></div>
+        </div>
+        <hr class="divider"/>
+        <button class="btn btn-danger" onclick="endSession()">End session &amp; save records</button>
+      </div>
+    </div>
+  </div>
+  <!-- RECORDS -->
+  <div class="tab-page" id="lec-pg-records">
+    <div class="pg">
+      <h2>My past sessions</h2>
+      <p class="sub">All your sessions. Admin backup is always preserved even if you delete here.</p>
+      <div id="records-list"><div class="no-rec">No completed sessions yet.</div></div>
+    </div>
+  </div>
+  <!-- REPORTS -->
+  <div class="tab-page" id="lec-pg-combined">
+    <div class="pg">
+      <h2>Course reports</h2>
+      <p class="sub">Attendance grouped by course. Download Excel files for each course.</p>
+      <div id="combined-list"><div class="no-rec">No sessions yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ ADMIN LOGIN ═══════ -->
+<div class="view center" id="view-admin-login">
+  <div class="auth-card">
+    <div class="auth-logo">🔐</div>
+    <div class="auth-title" id="admin-login-title">Admin Login</div>
+    <div class="auth-sub" id="admin-login-sub">Super admin and co-admin portal</div>
+    <div class="alert" id="al-alert"></div>
+    <!-- Super admin first-time setup (shown if no super admin exists) -->
+    <div id="sadm-setup" style="display:none">
+      <div class="strip amber"><strong>First time setup:</strong> Create the super admin account. This can only be done once.</div>
+      <div class="two-col">
+        <div class="field"><label>Full name</label><input type="text" id="sa-name" placeholder="Admin name"/></div>
+        <div class="field"><label>Institution</label><input type="text" id="sa-inst" placeholder="Institution name"/></div>
+      </div>
+      <div class="field"><label>Email</label><input type="email" id="sa-email" placeholder="admin@university.edu"/></div>
+      <div class="field"><label>Password</label>
+        <div class="pass-wrap">
+          <input type="password" id="sa-pass" placeholder="Min 8 characters"/>
+          <button class="eye" onclick="tgEye('sa-pass',this)" tabindex="-1">👁</button>
+        </div>
+      </div>
+      <div class="field"><label>Confirm password</label>
+        <input type="password" id="sa-pass2" placeholder="Repeat password"/>
+      </div>
+      <button class="btn btn-primary" id="sa-btn" onclick="setupSuperAdmin()">Create super admin account</button>
+    </div>
+    <!-- Normal login -->
+    <div id="sadm-login">
+      <div class="field"><label>Email</label>
+        <input type="email" id="al-email" placeholder="admin@university.edu" autocomplete="email"
+               onkeydown="if(event.key==='Enter')adminLogin()"/>
+      </div>
+      <div class="field"><label>Password</label>
+        <div class="pass-wrap">
+          <input type="password" id="al-pass" placeholder="Password" autocomplete="current-password"
+                 onkeydown="if(event.key==='Enter')adminLogin()"/>
+          <button class="eye" onclick="tgEye('al-pass',this)" tabindex="-1">👁</button>
+        </div>
+      </div>
+      <button class="btn btn-amber" onclick="adminLogin()">Enter admin panel</button>
+      <div class="auth-link">Want to be a co-admin? <a onclick="goTo('cadm-signup')">Apply here</a></div>
+    </div>
+    <div class="auth-link" style="margin-top:10px"><a onclick="goTo('landing')">← Back</a></div>
+  </div>
+</div>
+
+<!-- ═══════ CO-ADMIN SIGNUP ═══════ -->
+<div class="view center" id="view-cadm-signup">
+  <div class="auth-card" style="max-width:480px">
+    <div class="auth-logo">🤝</div>
+    <div class="auth-title">Co-Admin Application</div>
+    <div class="auth-sub">Submit your application — the super admin will approve or reject it</div>
+    <div class="alert" id="cs-alert"></div>
+    <div class="two-col">
+      <div class="field"><label>Full name</label><input type="text" id="cs-name" placeholder="Your name"/></div>
+      <div class="field"><label>Email</label><input type="email" id="cs-email" placeholder="email@uni.edu"/></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Institution</label><input type="text" id="cs-inst" placeholder="University name"/></div>
+      <div class="field"><label>Department</label><input type="text" id="cs-dept" placeholder="Department name"/></div>
+    </div>
+    <div class="field"><label>Password</label>
+      <div class="pass-wrap">
+        <input type="password" id="cs-pass" placeholder="Min 8 characters"/>
+        <button class="eye" onclick="tgEye('cs-pass',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <div class="field"><label>Confirm password</label>
+      <input type="password" id="cs-pass2" placeholder="Repeat password"/>
+    </div>
+    <div class="strip amber" style="font-size:12px">Your application will be reviewed by the super admin. You'll receive a confirmation once approved.</div>
+    <button class="btn btn-primary" id="cs-btn" onclick="coAdminSignup()">Submit application</button>
+    <div class="auth-link">Already approved? <a onclick="goTo('admin-login')">Sign in</a></div>
+    <div class="auth-link"><a onclick="goTo('landing')">← Back</a></div>
+  </div>
+</div>
+
+<!-- ═══════ SUPER ADMIN DASHBOARD ═══════ -->
+<div class="view" id="view-sadmin">
+  <div class="topbar">
+    <span class="topbar-icon">🔐</span>
+    <span class="topbar-title">Super Admin Dashboard</span>
+    <span class="rpill sadm">Super Admin</span>
+    <span class="topbar-user" id="sadm-name"></span>
+    <button class="topbar-btn" onclick="adminLogout()">Sign out</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="sAdminTab('ids')">Unique IDs</div>
+    <div class="tab" onclick="sAdminTab('lecturers')">Lecturers</div>
+    <div class="tab" onclick="sAdminTab('sessions')">All Sessions</div>
+    <div class="tab" onclick="sAdminTab('database')">Overall Database</div>
+    <div class="tab" onclick="sAdminTab('coadmins')">Co-Admins <span class="notif-dot" id="cadm-notif" style="display:none"></span></div>
+    <div class="tab" onclick="sAdminTab('settings')">Settings</div>
+  </div>
+  <!-- UNIQUE IDs -->
+  <div class="tab-page active" id="sadm-pg-ids">
+    <div class="pg">
+      <h2>Lecturer Unique IDs</h2>
+      <p class="sub">Generate and assign unique IDs to lecturers. Each ID is from a pool of 999 billion and can only be used once to register one account.</p>
+      <div class="strip amber"><strong>How to distribute:</strong> Generate an ID, copy it, and send it to the lecturer by email, WhatsApp or letter. They enter it on the registration page.</div>
+      <div style="background:#fff;border:1px solid #e5e3da;border-radius:12px;padding:16px;margin-bottom:16px">
+        <h3>Generate a new Unique ID</h3>
+        <div class="two-col" style="margin-top:10px">
+          <div class="field"><label>Intended for (name)</label>
+            <input type="text" id="uid-name" placeholder="Lecturer name (for your reference)"/>
+          </div>
+          <div class="field"><label>Department (optional)</label>
+            <input type="text" id="uid-dept" placeholder="Department"/>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="generateUID()">Generate Unique ID</button>
+        <div id="uid-result" style="display:none;margin-top:12px">
+          <div class="uid-display">
+            <div class="uid-label">Unique Lecturer ID — copy and send to lecturer</div>
+            <div class="uid-code" id="uid-display-val"></div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="copyUID()" style="margin-top:8px">📋 Copy ID</button>
+        </div>
+      </div>
+      <div class="list-hdr">
+        <h3>All issued IDs</h3>
+        <div style="display:flex;gap:7px;align-items:center">
+          <select id="uid-filter" onchange="renderUIDs()" style="padding:6px 10px;font-size:12px;width:auto">
+            <option value="all">All</option>
+            <option value="available">Available</option>
+            <option value="assigned">Assigned</option>
+            <option value="revoked">Revoked</option>
+          </select>
+          <span class="badge" id="uid-count">0</span>
+        </div>
+      </div>
+      <div id="uid-list"><div class="no-rec">No IDs generated yet.</div></div>
+      <div class="paginator">
+        <button onclick="uidPage(-1)" id="uid-prev">← Prev</button>
+        <span id="uid-pg-info">Page 1</span>
+        <button onclick="uidPage(1)" id="uid-next">Next →</button>
+        <span style="margin-left:auto" id="uid-pg-summary"></span>
+      </div>
+    </div>
+  </div>
+  <!-- LECTURERS -->
+  <div class="tab-page" id="sadm-pg-lecturers">
+    <div class="pg">
+      <h2>All lecturers</h2>
+      <p class="sub">All registered lecturers across all institutions.</p>
+      <div id="sadm-lecturers-list"><div class="no-rec">No lecturers registered yet.</div></div>
+    </div>
+  </div>
+  <!-- ALL SESSIONS -->
+  <div class="tab-page" id="sadm-pg-sessions">
+    <div class="pg">
+      <h2>All sessions</h2>
+      <p class="sub">Every session across all lecturers and institutions.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+        <select id="sadm-sess-inst" onchange="renderSAdmSessions()" style="padding:7px 10px;font-size:12px;width:auto">
+          <option value="all">All institutions</option>
+        </select>
+        <select id="sadm-sess-lec" onchange="renderSAdmSessions()" style="padding:7px 10px;font-size:12px;width:auto">
+          <option value="all">All lecturers</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="exportSAdmSessionsCSV()">Export CSV</button>
+      </div>
+      <div id="sadm-sessions-list"><div class="no-rec">No sessions yet.</div></div>
+    </div>
+  </div>
+  <!-- OVERALL DATABASE -->
+  <div class="tab-page" id="sadm-pg-database">
+    <div class="pg">
+      <h2>Overall attendance database</h2>
+      <p class="sub">All attendance records collated by institution, department, lecturer and course. Download master Excel files.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+        <select id="sadm-db-inst" onchange="renderSAdmDB()" style="padding:7px 10px;font-size:12px;width:auto">
+          <option value="all">All institutions</option>
+        </select>
+        <select id="sadm-db-course" onchange="renderSAdmDB()" style="padding:7px 10px;font-size:12px;width:auto">
+          <option value="all">All courses</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="exportMasterExcel('sadm')">⬇ Master Excel</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportMasterCSV('sadm')">⬇ CSV</button>
+      </div>
+      <div id="sadm-db-list"><div class="no-rec">No data yet.</div></div>
+    </div>
+  </div>
+  <!-- CO-ADMINS -->
+  <div class="tab-page" id="sadm-pg-coadmins">
+    <div class="pg">
+      <h2>Co-admin management</h2>
+      <p class="sub">Approve, manage and revoke co-admin access.</p>
+      <div id="pending-apps-section" style="display:none">
+        <div class="strip amber"><strong>⏳ Pending applications</strong> — review and approve or reject:</div>
+        <div id="pending-apps-list"></div>
+        <hr class="divider"/>
+      </div>
+      <div class="list-hdr"><h3>Active co-admins</h3></div>
+      <div id="sadm-coadmins-list"><div class="no-rec">No co-admins yet.</div></div>
+    </div>
+  </div>
+  <!-- SETTINGS -->
+  <div class="tab-page" id="sadm-pg-settings">
+    <div class="pg">
+      <h2>Settings</h2>
+      <p class="sub">System overview and account settings.</p>
+      <div class="strip gray" id="sadm-stats"></div>
+      <div style="background:#fff;border:1px solid #e5e3da;border-radius:12px;padding:16px;margin-bottom:14px">
+        <h3>Change password</h3>
+        <div class="alert" id="spw-err"></div><div class="alert" id="spw-ok"></div>
+        <div class="field" style="margin-top:10px"><label>Current password</label>
+          <input type="password" id="spw-cur" placeholder="Current password"/></div>
+        <div class="field"><label>New password</label>
+          <input type="password" id="spw-new" placeholder="Min 8 characters"/></div>
+        <div class="field"><label>Confirm</label>
+          <input type="password" id="spw-new2" placeholder="Repeat new password"/></div>
+        <button class="btn btn-primary btn-sm" onclick="changeSAdmPw()">Update password</button>
+      </div>
+      <div style="background:#fff;border:1px solid #f7c1c1;border-radius:12px;padding:16px">
+        <h3 style="color:#a32d2d">Danger zone</h3>
+        <p style="font-size:13px;color:#666;margin:7px 0 12px">Permanently deletes all data except the super admin account.</p>
+        <button class="btn btn-danger btn-sm" onclick="resetAll()">Reset all data</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ CO-ADMIN DASHBOARD ═══════ -->
+<div class="view" id="view-cadmin">
+  <div class="topbar">
+    <span class="topbar-icon">🤝</span>
+    <span class="topbar-title">Co-Admin Dashboard</span>
+    <span class="rpill cadm">Co-Admin</span>
+    <span class="topbar-user" id="cadm-topbar-name"></span>
+    <button class="topbar-btn" onclick="adminLogout()">Sign out</button>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="cAdminTab('ids')">Assign IDs</div>
+    <div class="tab" onclick="cAdminTab('lecturers')">Lecturers</div>
+    <div class="tab" onclick="cAdminTab('sessions')">Sessions</div>
+    <div class="tab" onclick="cAdminTab('database')">Database</div>
+  </div>
+  <!-- ASSIGN IDs -->
+  <div class="tab-page active" id="cadm-pg-ids">
+    <div class="pg">
+      <h2>Assign Lecturer IDs</h2>
+      <p class="sub">Generate and assign unique IDs to lecturers in <strong id="cadm-dept-label"></strong>.</p>
+      <div style="background:#fff;border:1px solid #e5e3da;border-radius:12px;padding:16px;margin-bottom:14px">
+        <h3>Generate ID for a lecturer</h3>
+        <div class="field" style="margin-top:10px">
+          <label>Intended for (lecturer name)</label>
+          <input type="text" id="cadm-uid-name" placeholder="Lecturer name"/>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="cAdminGenerateUID()">Generate ID</button>
+        <div id="cadm-uid-result" style="display:none;margin-top:12px">
+          <div class="uid-display">
+            <div class="uid-label">Unique Lecturer ID — send this to the lecturer</div>
+            <div class="uid-code" id="cadm-uid-val"></div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="cAdminCopyUID()" style="margin-top:8px">📋 Copy ID</button>
+        </div>
+      </div>
+      <div class="list-hdr">
+        <h3>IDs issued by you</h3><span class="badge" id="cadm-uid-count">0</span>
+      </div>
+      <div id="cadm-uid-list"><div class="no-rec">No IDs issued yet.</div></div>
+    </div>
+  </div>
+  <!-- LECTURERS (dept only) -->
+  <div class="tab-page" id="cadm-pg-lecturers">
+    <div class="pg">
+      <h2>Lecturers in your department</h2>
+      <p class="sub">Only lecturers from your institution and department are shown.</p>
+      <div id="cadm-lecturers-list"><div class="no-rec">No lecturers in your department yet.</div></div>
+    </div>
+  </div>
+  <!-- SESSIONS (dept only) -->
+  <div class="tab-page" id="cadm-pg-sessions">
+    <div class="pg">
+      <h2>Sessions in your department</h2>
+      <p class="sub">Sessions from lecturers in your institution and department only.</p>
+      <div id="cadm-sessions-list"><div class="no-rec">No sessions yet.</div></div>
+    </div>
+  </div>
+  <!-- DATABASE (dept only) -->
+  <div class="tab-page" id="cadm-pg-database">
+    <div class="pg">
+      <h2>Department attendance database</h2>
+      <p class="sub">All attendance records for your department, grouped by course and lecturer.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <select id="cadm-db-lec" onchange="renderCAdmDB()" style="padding:7px 10px;font-size:12px;width:auto">
+          <option value="all">All lecturers</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="exportMasterExcel('cadm')">⬇ Department Excel</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportMasterCSV('cadm')">⬇ CSV</button>
+      </div>
+      <div id="cadm-db-list"><div class="no-rec">No data yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ STUDENT SCAN PROMPT ═══════ -->
+<div class="view" id="view-stu-scan">
+  <div class="topbar">
+    <span class="topbar-icon">🎒</span>
+    <span class="topbar-title">Student Check-in</span>
+    <span class="rpill stu">Student</span>
+  </div>
+  <div class="pg" style="text-align:center;padding-top:55px">
+    <div style="font-size:54px;margin-bottom:12px">📷</div>
+    <h2>Scan the QR code</h2>
+    <p class="sub" style="margin-top:6px">Your lecturer must start a session. Scan the QR code they display.</p>
+    <div class="info-card" style="text-align:left;margin-top:8px">
+      <p>How it works</p>
+      <ul>
+        <li>Lecturer starts a session and shows the QR code</li>
+        <li>Scan it — your phone opens the check-in page</li>
+        <li>Enter name and student ID to sign in</li>
+        <li>Your check-in appears on the lecturer's screen instantly</li>
+      </ul>
+    </div>
+    <button class="btn btn-secondary" style="max-width:200px;margin:16px auto 0" onclick="goTo('landing')">← Back</button>
+  </div>
+</div>
+
+<!-- ═══════ STUDENT CHECK-IN ═══════ -->
+<div class="view" id="view-stu-checkin">
+  <div class="topbar">
+    <span class="topbar-icon">🎒</span>
+    <span class="topbar-title">Student Check-in</span>
+    <span class="rpill stu">Student</span>
+  </div>
+  <div class="pg">
+    <div class="state-blk show" id="stu-loading">
+      <div class="state-icon">⏳</div><div class="state-title">Loading…</div>
+    </div>
+    <div class="state-blk" id="stu-invalid">
+      <div class="state-icon">⚠️</div>
+      <div class="state-title" id="inv-title">Invalid QR code</div>
+      <div class="state-msg" id="inv-msg">This QR code is invalid or has expired.</div>
+    </div>
+    <div class="state-blk" id="stu-done">
+      <div class="state-icon">✅</div>
+      <div class="state-title">You're checked in!</div>
+      <div class="state-msg" id="done-msg">Attendance recorded.</div>
+    </div>
+    <div id="stu-form" style="display:none">
+      <h2>Check in to class</h2>
+      <p class="sub">A session is active. Fill in your details.</p>
+      <div class="stu-sess">
+        <div class="stu-code" id="s-code">—</div>
+        <div class="stu-name" id="s-course">—</div>
+        <div class="stu-meta">
+          <span>📅 <span id="s-date">—</span></span>
+          <span class="countdown ok" id="s-cd">—</span>
+        </div>
+      </div>
+      <div class="fp-box">
+        <div class="fp-lbl">Your device fingerprint</div>
+        <div class="fp-val" id="s-fp">—</div>
+      </div>
+      <div class="field"><label>Full name</label>
+        <input type="text" id="s-name" placeholder="Ama Owusu" autocomplete="name"/>
+      </div>
+      <div class="field">
+        <label>Student ID <span style="color:#a32d2d;font-size:10px">— unique per session</span></label>
+        <input type="text" id="s-sid" placeholder="UG/2023/0042" autocomplete="off"/>
+      </div>
+      <div class="loc-status idle" id="ls-box">
+        <div class="ls-dot"></div><span id="ls-text">Location required — tap to get location</span>
+      </div>
+      <div id="loc-btn-row" style="display:none">
+        <div class="row-btns">
+          <button class="btn btn-teal" onclick="getStudentLoc()">📍 Get my location</button>
+          <button class="btn btn-primary" id="ci-btn-loc" onclick="checkIn()">Check in</button>
+        </div>
+      </div>
+      <div id="no-loc-row">
+        <button class="btn btn-primary" id="ci-btn" onclick="checkIn()">Check in</button>
+      </div>
+      <div class="result-box result-ok" id="res-ok"></div>
+      <div class="result-box result-err" id="res-err"></div>
+      <div class="info-card" style="margin-top:16px">
+        <p>Security rules</p>
+        <ul>
+          <li>One device per sign-in</li>
+          <li>Student ID must be unique in this session</li>
+          <li>QR code expires after the set duration</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ────────────────────────────────────────
+   FIREBASE CONFIG — replace with yours
+──────────────────────────────────────── */
+const FB_CFG = {
+  apiKey:            'YOUR_API_KEY',
+  authDomain:        'YOUR_PROJECT.firebaseapp.com',
+  databaseURL:       'https://YOUR_PROJECT-default-rtdb.firebaseio.com',
+  projectId:         'YOUR_PROJECT',
+  storageBucket:     'YOUR_PROJECT.appspot.com',
+  messagingSenderId: 'YOUR_SENDER_ID',
+  appId:             'YOUR_APP_ID'
+};
+/* ─────────────────────────────────────── */
+
+/* ── Firebase init ── */
+let fbDb = null, FB_READY = false;
+(function(){
+  if (FB_CFG.apiKey.startsWith('YOUR_')) return;
+  try {
+    firebase.initializeApp(FB_CFG);
+    fbDb = firebase.database();
+    FB_READY = true;
+    fbDb.ref('.info/connected').on('value', s => { if(s.val()) processQueue(); });
+  } catch(e) { console.warn('Firebase:', e.message); }
+})();
+
+/* ── BroadcastChannel (same-browser demo sync) ── */
+let bc = null;
+try { bc = new BroadcastChannel('qratt_live'); } catch(e){}
+function bcPost(m){ try{ bc?.postMessage(m); }catch(e){} }
+if (bc) bc.onmessage = e => {
+  const m = e.data;
+  if (m?.type==='record'  && A.session?.id===m.sid) renderLiveAtt(LS.records(m.sid));
+  if (m?.type==='blocked' && A.session?.id===m.sid) renderLiveBlk(LS.blocked(m.sid));
+  if (m?.type==='lec_signup') { refreshSAdmData(); refreshCAdmData(); }
+  if (m?.type==='session_start') { refreshSAdmData(); refreshCAdmData(); }
+};
+
+/* ── App state ── */
+const A = {
+  lec:null, session:null,
+  isSuper:false, isCo:false,
+  superAdmin:null, coAdmin:null,
+  locOn:true,            // ← location fence ON by default
+  tickTimer:null,
+  fbUnsubRec:null, fbUnsubBlk:null,
+  stuSession:null, stuCdTimer:null,
+  stuLat:null, stuLng:null,
+  uidPageIdx:0,
+};
+
+/* ── LocalStorage DB ── */
+const LS = {
+  _: k => 'qratt_'+k,
+  get(k)   { try{return JSON.parse(localStorage.getItem(this._(k)));}catch{return null;} },
+  set(k,v) { try{localStorage.setItem(this._(k),JSON.stringify(v));}catch(e){} },
+  del(k)   { localStorage.removeItem(this._(k)); },
+  superAdmin()       { return this.get('superAdmin'); },
+  saveSuperAdmin(x)  { this.set('superAdmin',x); },
+  coAdmins()         { return this.get('coAdmins')  ||[]; },
+  saveCoAdmins(a)    { this.set('coAdmins',a); },
+  lecturers()        { return this.get('lecturers') ||[]; },
+  saveLecturers(a)   { this.set('lecturers',a); },
+  sessions()         { return this.get('sessions')  ||[]; },
+  saveSessions(a)    { this.set('sessions',a); },
+  uids()             { return this.get('uids')      ||[]; },
+  saveUIDs(a)        { this.set('uids',a); },
+  backup()           { return this.get('backup')    ||{}; },
+  saveBackup(a)      { this.set('backup',a); },
+  queue()            { return this.get('queue')     ||[]; },
+  saveQueue(a)       { this.set('queue',a); },
+  records(id)        { return this.get('rec_'+id)   ||[]; },
+  blocked(id)        { return this.get('blk_'+id)   ||[]; },
+  devices(id)        { return this.get('dev_'+id)   ||[]; },
+  sids(id)           { return this.get('sid_'+id)   ||[]; },
+  pushRecord(id,r)   { const a=this.records(id); a.push(r); this.set('rec_'+id,a); },
+  pushBlocked(id,b)  { const a=this.blocked(id); a.push(b); this.set('blk_'+id,a); },
+  addDevice(id,fp)   { const a=this.devices(id); if(!a.includes(fp)){a.push(fp);this.set('dev_'+id,a);} },
+  addSid(id,sid)     { const a=this.sids(id); const n=sid.toUpperCase(); if(!a.includes(n)){a.push(n);this.set('sid_'+id,a);} },
+  isDeviceUsed(id,fp){ return this.devices(id).includes(fp); },
+  isSidUsed(id,sid)  { return this.sids(id).includes(sid.toUpperCase()); },
+};
+
+/* ── Firebase helpers ── */
+const DB = {
+  async getSA() {
+    if(FB_READY){ const s=await fbDb.ref('superAdmin').once('value').catch(()=>null); if(s?.val())return s.val(); }
+    return LS.superAdmin();
+  },
+  async saveSA(x) {
+    LS.saveSuperAdmin(x);
+    if(FB_READY) await fbDb.ref('superAdmin').set(x).catch(()=>{});
+  },
+  async getCAs() {
+    if(FB_READY){ const s=await fbDb.ref('coAdmins').once('value').catch(()=>null); if(s?.val())return Object.values(s.val()); }
+    return LS.coAdmins();
+  },
+  async saveCA(ca) {
+    const all=LS.coAdmins().filter(c=>c.id!==ca.id); all.push(ca); LS.saveCoAdmins(all);
+    if(FB_READY) await fbDb.ref('coAdmins/'+ca.id).set(ca).catch(()=>{});
+  },
+  async deleteCA(id) {
+    LS.saveCoAdmins(LS.coAdmins().filter(c=>c.id!==id));
+    if(FB_READY) await fbDb.ref('coAdmins/'+id).remove().catch(()=>{});
+  },
+  async getLecturers() {
+    if(FB_READY){ const s=await fbDb.ref('lecturers').once('value').catch(()=>null); if(s?.val())return Object.values(s.val()); }
+    return LS.lecturers();
+  },
+  async getLecByEmail(email) {
+    const lecs=await this.getLecturers(); return lecs.find(l=>l.email===email.toLowerCase())||null;
+  },
+  async saveLec(lec) {
+    LS.saveLecturers([...LS.lecturers().filter(l=>l.id!==lec.id),lec]);
+    if(FB_READY) await fbDb.ref('lecturers/'+lec.id).set(lec).catch(()=>{});
+    bcPost({type:'lec_signup',lecId:lec.id});
+  },
+  async deleteLec(id) {
+    LS.saveLecturers(LS.lecturers().filter(l=>l.id!==id));
+    if(FB_READY) await fbDb.ref('lecturers/'+id).remove().catch(()=>{});
+  },
+  async getSession(id) {
+    if(FB_READY){ const s=await fbDb.ref('sessions/'+id).once('value').catch(()=>null); if(s?.val())return s.val(); }
+    return LS.sessions().find(s=>s.id===id)||null;
+  },
+  async saveSession(sess) {
+    LS.saveSessions([...LS.sessions().filter(s=>s.id!==sess.id),sess]);
+    if(FB_READY) await fbDb.ref('sessions/'+sess.id).set(sess).catch(()=>{});
+    bcPost({type:'session_start',sessionId:sess.id});
+  },
+  async updateSession(id,data) {
+    LS.saveSessions(LS.sessions().map(s=>s.id===id?{...s,...data}:s));
+    if(FB_READY) await fbDb.ref('sessions/'+id).update(data).catch(()=>{});
+  },
+  async getSessionsByLecId(lecFirebaseId) {
+    if(FB_READY){ const s=await fbDb.ref('sessions').orderByChild('lecFirebaseId').equalTo(lecFirebaseId).once('value').catch(()=>null); if(s?.val())return Object.values(s.val()); }
+    return LS.sessions().filter(s=>s.lecFirebaseId===lecFirebaseId);
+  },
+  async getAllSessions() {
+    if(FB_READY){ const s=await fbDb.ref('sessions').once('value').catch(()=>null); if(s?.val())return Object.values(s.val()); }
+    return LS.sessions();
+  },
+  async pushRecord(sessionId,rec) {
+    LS.pushRecord(sessionId,rec);
+    if(FB_READY) await fbDb.ref('sessions/'+sessionId+'/records').push(rec).catch(()=>{});
+    else if(!navigator.onLine) LS.saveQueue([...LS.queue(),{type:'record',sessionId,rec}]);
+    bcPost({type:'record',sid:sessionId});
+  },
+  async pushBlocked(sessionId,item) {
+    LS.pushBlocked(sessionId,item);
+    if(FB_READY) await fbDb.ref('sessions/'+sessionId+'/blocked').push(item).catch(()=>{});
+    bcPost({type:'blocked',sid:sessionId});
+  },
+  async addDevice(sessionId,fp) {
+    LS.addDevice(sessionId,fp);
+    if(FB_READY) await fbDb.ref('sessions/'+sessionId+'/devices/'+fp.replace(/\W/g,'_')).set(true).catch(()=>{});
+  },
+  async addSid(sessionId,sid) {
+    LS.addSid(sessionId,sid);
+    if(FB_READY){ const k=b64e(sid.toUpperCase()).replace(/\W/g,'_'); await fbDb.ref('sessions/'+sessionId+'/sids/'+k).set(sid.toUpperCase()).catch(()=>{}); }
+  },
+  async isDeviceUsed(sessionId,fp) {
+    if(FB_READY){ const s=await fbDb.ref('sessions/'+sessionId+'/devices/'+fp.replace(/\W/g,'_')).once('value').catch(()=>null); if(s)return s.exists(); }
+    return LS.isDeviceUsed(sessionId,fp);
+  },
+  async isSidUsed(sessionId,sid) {
+    if(FB_READY){ const k=b64e(sid.toUpperCase()).replace(/\W/g,'_'); const s=await fbDb.ref('sessions/'+sessionId+'/sids/'+k).once('value').catch(()=>null); if(s)return s.exists(); }
+    return LS.isSidUsed(sessionId,sid);
+  },
+  async getRecords(sessionId) {
+    if(FB_READY){ const s=await fbDb.ref('sessions/'+sessionId+'/records').once('value').catch(()=>null); if(s?.val())return Object.values(s.val()); }
+    return LS.records(sessionId);
+  },
+  async getBlocked(sessionId) {
+    if(FB_READY){ const s=await fbDb.ref('sessions/'+sessionId+'/blocked').once('value').catch(()=>null); if(s?.val())return Object.values(s.val()); }
+    return LS.blocked(sessionId);
+  },
+  listenRecords(sessionId,cb) {
+    if(FB_READY){ const ref=fbDb.ref('sessions/'+sessionId+'/records'); const fn=s=>cb(s.val()?Object.values(s.val()):[]);ref.on('value',fn);return()=>ref.off('value',fn); }
+    cb(LS.records(sessionId));
+    const t=setInterval(()=>cb(LS.records(sessionId)),1500);
+    return ()=>clearInterval(t);
+  },
+  listenBlocked(sessionId,cb) {
+    if(FB_READY){ const ref=fbDb.ref('sessions/'+sessionId+'/blocked'); const fn=s=>cb(s.val()?Object.values(s.val()):[]);ref.on('value',fn);return()=>ref.off('value',fn); }
+    cb(LS.blocked(sessionId));
+    const t=setInterval(()=>cb(LS.blocked(sessionId)),1500);
+    return ()=>clearInterval(t);
+  },
+  async saveBackup(sess,records,blocked) {
+    const entry={session:sess,records,blocked,savedAt:new Date().toISOString()};
+    const all=LS.backup(); if(!all[sess.lecId])all[sess.lecId]={}; all[sess.lecId][sess.id]=entry; LS.saveBackup(all);
+    if(FB_READY) await fbDb.ref('backup/'+sess.lecId+'/'+sess.id).set(entry).catch(()=>{});
+  },
+  /* UIDs */
+  getUIDs() { return LS.uids(); },
+  saveUIDs(a){ LS.saveUIDs(a); if(FB_READY) fbDb.ref('uids').set(a.reduce((o,u)=>{o[u.id.replace(/\W/g,'_')]=u;return o;},{})).catch(()=>{}); },
+};
+
+/* ── Offline queue ── */
+async function processQueue(){
+  const q=LS.queue(); if(!q.length)return;
+  const failed=[];
+  for(const item of q){
+    try{ if(item.type==='record'&&FB_READY) await fbDb.ref('sessions/'+item.sessionId+'/records').push(item.rec); }
+    catch{ failed.push(item); }
+  }
+  LS.saveQueue(failed);
+}
+
+/* ══════════════════════════════════════
+   UNIQUE ID GENERATION (999 billion pool)
+   Format: LEC-XXXXXXXXXX (10 chars from 32-char alphabet)
+   32^10 = 1,099,511,627,776 ≈ 1.1 trillion > 999 billion ✓
+══════════════════════════════════════ */
+const UID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 32 chars, no O,0,I,1
+
+function genUID(){
+  let code='LEC-';
+  const bytes=crypto.getRandomValues(new Uint8Array(10));
+  for(const b of bytes) code+=UID_CHARS[b%32];
+  return code;
+}
+
+function generateUID(){
+  const name=Q('uid-name').value.trim();
+  const dept=Q('uid-dept').value.trim();
+  const uid=genUID();
+  const all=DB.getUIDs();
+  // Ensure uniqueness (collision rate is ~10^-12, but check anyway)
+  const existing=new Set(all.map(u=>u.id));
+  let finalUID=uid; let tries=0;
+  while(existing.has(finalUID)&&tries<20){finalUID=genUID();tries++;}
+  all.push({id:finalUID,status:'available',intendedFor:name||'(unspecified)',dept:dept||'',createdBy:A.isSuper?'superAdmin':(A.coAdmin?.id||'?'),createdAt:new Date().toISOString(),assignedTo:null,assignedAt:null});
+  DB.saveUIDs(all);
+  Q('uid-display-val').textContent=finalUID; Q('uid-result').style.display='block';
+  Q('uid-name').value=''; Q('uid-dept').value='';
+  renderUIDs();
+  return finalUID;
+}
+
+function cAdminGenerateUID(){
+  const name=Q('cadm-uid-name').value.trim();
+  const uid=genUID();
+  const all=DB.getUIDs();
+  const existing=new Set(all.map(u=>u.id));
+  let finalUID=uid, tries=0;
+  while(existing.has(finalUID)&&tries<20){finalUID=genUID();tries++;}
+  all.push({id:finalUID,status:'available',intendedFor:name||'(unspecified)',dept:A.coAdmin?.dept||'',institution:A.coAdmin?.institution||'',createdBy:A.coAdmin?.id||'?',createdAt:new Date().toISOString(),assignedTo:null,assignedAt:null});
+  DB.saveUIDs(all);
+  Q('cadm-uid-val').textContent=finalUID; Q('cadm-uid-result').style.display='block';
+  Q('cadm-uid-name').value='';
+  renderCAdmUIDs();
+  return finalUID;
+}
+
+function copyUID(){ const v=Q('uid-display-val').textContent; navigator.clipboard?.writeText(v).then(()=>alert('ID copied: '+v)).catch(()=>alert('Copy: '+v)); }
+function cAdminCopyUID(){ const v=Q('cadm-uid-val').textContent; navigator.clipboard?.writeText(v).then(()=>alert('ID copied: '+v)).catch(()=>alert('Copy: '+v)); }
+
+function revokeUID(id){
+  if(!confirm('Revoke this Unique ID? If it has been assigned, that lecturer account will lose its ID.')) return;
+  DB.saveUIDs(DB.getUIDs().map(u=>u.id===id?{...u,status:'revoked'}:u));
+  renderUIDs(); renderCAdmUIDs();
+}
+
+/* ══════════════════════════════════════
+   LECTURER ID ASSIGNMENT
+   When a lecturer signs up with a UID, mark it assigned.
+══════════════════════════════════════ */
+function validateAndClaimUID(uidStr){
+  const all=DB.getUIDs();
+  const idx=all.findIndex(u=>u.id===uidStr&&u.status==='available');
+  if(idx===-1) return null;
+  all[idx]={...all[idx],status:'assigned',assignedAt:new Date().toISOString()};
+  DB.saveUIDs(all);
+  return all[idx];
+}
+
+/* ── Paginated UID table ── */
+const UID_PAGE=30;
+function renderUIDs(){
+  const filter=Q('uid-filter')?.value||'all';
+  const all=DB.getUIDs().filter(u=>filter==='all'||u.status===filter);
+  if(Q('uid-count')) Q('uid-count').textContent=all.length;
+  const start=A.uidPageIdx*UID_PAGE, page=all.slice(start,start+UID_PAGE);
+  const el=Q('uid-list'); if(!el)return;
+  el.innerHTML=page.length
+    ? page.map(u=>`
+      <div class="att-item">
+        <div class="att-dot" style="background:${u.status==='available'?'#639922':u.status==='revoked'?'#e24b4a':'#888'}"></div>
+        <span style="font-family:monospace;font-weight:600;font-size:13px;color:${u.status==='available'?'#534ab7':'#888'}">${esc(u.id)}</span>
+        <span class="pill ${u.status==='available'?'green':u.status==='assigned'?'gray':'red'}">${u.status}</span>
+        <span style="font-size:12px;color:#666">${esc(u.intendedFor||'—')}</span>
+        <span class="att-time">${new Date(u.createdAt).toLocaleDateString()}</span>
+        ${u.status==='available'?`<button class="btn btn-danger btn-sm" onclick="revokeUID('${u.id}')">Revoke</button>`:''}
+      </div>`).join('')
+    :'<div class="no-rec">No IDs match this filter.</div>';
+  const tp=Math.max(1,Math.ceil(all.length/UID_PAGE));
+  if(Q('uid-pg-info')) Q('uid-pg-info').textContent=`Page ${A.uidPageIdx+1} of ${tp}`;
+  if(Q('uid-pg-summary')) Q('uid-pg-summary').textContent=all.length.toLocaleString()+' IDs';
+  if(Q('uid-prev')) Q('uid-prev').disabled=A.uidPageIdx===0;
+  if(Q('uid-next')) Q('uid-next').disabled=A.uidPageIdx>=tp-1;
+}
+function uidPage(d){ const tp=Math.max(1,Math.ceil(DB.getUIDs().length/UID_PAGE)); A.uidPageIdx=Math.max(0,Math.min(A.uidPageIdx+d,tp-1)); renderUIDs(); }
+
+function renderCAdmUIDs(){
+  const myId=A.coAdmin?.id; const all=DB.getUIDs().filter(u=>u.createdBy===myId);
+  if(Q('cadm-uid-count')) Q('cadm-uid-count').textContent=all.length;
+  const el=Q('cadm-uid-list'); if(!el)return;
+  el.innerHTML=all.length
+    ? all.map(u=>`
+      <div class="att-item">
+        <div class="att-dot" style="background:${u.status==='available'?'#639922':u.status==='revoked'?'#e24b4a':'#888'}"></div>
+        <span style="font-family:monospace;font-weight:600;font-size:13px;color:#534ab7">${esc(u.id)}</span>
+        <span class="pill ${u.status==='available'?'green':u.status==='assigned'?'gray':'red'}">${u.status}</span>
+        <span style="font-size:12px;color:#666">${esc(u.intendedFor||'—')}</span>
+        <span class="att-time">${new Date(u.createdAt).toLocaleDateString()}</span>
+        ${u.status==='available'?`<button class="btn btn-danger btn-sm" onclick="revokeUID('${u.id}');renderCAdmUIDs()">Revoke</button>`:''}
+      </div>`).join('')
+    :'<div class="no-rec">No IDs issued yet.</div>';
+}
+
+/* ══════════════════════════════════════
+   SUPER ADMIN SETUP & AUTH
+══════════════════════════════════════ */
+async function checkAdminSetup(){
+  const sa=await DB.getSA();
+  if(!sa){
+    // First time — show setup form
+    Q('sadm-setup').style.display='block';
+    Q('sadm-login').style.display='none';
+    Q('admin-login-title').textContent='Create Super Admin';
+    Q('admin-login-sub').textContent='First-time setup — this runs only once';
+  } else {
+    Q('sadm-setup').style.display='none';
+    Q('sadm-login').style.display='block';
+    Q('admin-login-title').textContent='Admin Login';
+    Q('admin-login-sub').textContent='Super admin and co-admin portal';
+  }
+}
+
+async function setupSuperAdmin(){
+  const name=Q('sa-name').value.trim();
+  const inst=Q('sa-inst').value.trim();
+  const email=Q('sa-email').value.trim().toLowerCase();
+  const pass=Q('sa-pass').value;
+  const pass2=Q('sa-pass2').value;
+  clrAlert('al-alert');
+  if(!name||!inst||!email||!pass) return setAlert('al-alert','All fields are required.');
+  if(pass.length<8) return setAlert('al-alert','Password must be at least 8 characters.');
+  if(pass!==pass2)  return setAlert('al-alert','Passwords do not match.');
+  btnLoading('sa-btn',true);
+  const sa={id:makeToken(),name,institution:inst,email,pwHash:hashPw(pass),createdAt:new Date().toISOString()};
+  await DB.saveSA(sa);
+  btnLoading('sa-btn',false,'Create super admin account');
+  setAlert('al-alert','Super admin account created! Sign in now.','ok');
+  setTimeout(()=>checkAdminSetup(),1000);
+}
+
+async function adminLogin(){
+  const email=Q('al-email').value.trim().toLowerCase();
+  const pass=Q('al-pass').value;
+  clrAlert('al-alert');
+  if(!email||!pass) return setAlert('al-alert','Enter email and password.');
+  // Check super admin
+  const sa=await DB.getSA();
+  if(sa&&sa.email===email&&sa.pwHash===hashPw(pass)){
+    A.isSuper=true; A.isCo=false; A.superAdmin=sa;
+    Q('sadm-name').textContent=sa.name;
+    goTo('sadmin');
+    refreshSAdmData(); return;
+  }
+  // Check co-admins
+  const cas=await DB.getCAs();
+  const ca=cas.find(c=>c.email===email&&c.pwHash===hashPw(pass));
+  if(ca){
+    if(ca.status==='pending') return setAlert('al-alert','Your application is pending approval from the super admin.');
+    if(ca.status==='revoked') return setAlert('al-alert','Your co-admin access has been revoked. Contact the super admin.');
+    A.isSuper=false; A.isCo=true; A.coAdmin=ca;
+    Q('cadm-topbar-name').textContent=ca.name;
+    Q('cadm-dept-label').textContent=ca.department+' — '+ca.institution;
+    goTo('cadmin');
+    refreshCAdmData(); return;
+  }
+  setAlert('al-alert','Invalid email or password.');
+}
+
+function adminLogout(){
+  A.isSuper=false; A.isCo=false; A.superAdmin=null; A.coAdmin=null;
+  goTo('landing');
+}
+
+/* ── Co-admin signup ── */
+async function coAdminSignup(){
+  const name=Q('cs-name').value.trim(), email=Q('cs-email').value.trim().toLowerCase();
+  const inst=Q('cs-inst').value.trim(), dept=Q('cs-dept').value.trim();
+  const pass=Q('cs-pass').value, pass2=Q('cs-pass2').value;
+  clrAlert('cs-alert');
+  if(!name||!email||!inst||!dept||!pass) return setAlert('cs-alert','All fields are required.');
+  if(pass.length<8) return setAlert('cs-alert','Password must be at least 8 characters.');
+  if(pass!==pass2)  return setAlert('cs-alert','Passwords do not match.');
+  btnLoading('cs-btn',true);
+  const all=await DB.getCAs();
+  if(all.find(c=>c.email===email)){ btnLoading('cs-btn',false,'Submit application'); return setAlert('cs-alert','An account with this email already exists.'); }
+  const ca={id:makeToken(),name,email,institution:inst,department:dept,pwHash:hashPw(pass),status:'pending',createdAt:new Date().toISOString()};
+  await DB.saveCA(ca);
+  btnLoading('cs-btn',false,'Submit application');
+  setAlert('cs-alert','✓ Application submitted! The super admin will review it shortly.','ok');
+  // Clear form
+  ['cs-name','cs-email','cs-inst','cs-dept','cs-pass','cs-pass2'].forEach(id=>{ if(Q(id)) Q(id).value=''; });
+}
+
+/* ── Super admin data refresh ── */
+async function refreshSAdmData(){
+  renderSAdmStats(); renderUIDs(); renderSAdmLecturers(); renderSAdmSessions();
+  renderSAdmDB(); renderSAdmCoAdmins();
+}
+async function refreshCAdmData(){
+  renderCAdmUIDs(); renderCAdmLecturers(); renderCAdmSessions(); renderCAdmDB();
+}
+
+async function renderSAdmStats(){
+  const lecs=await DB.getLecturers(), sessions=await DB.getAllSessions();
+  const cas=await DB.getCAs();
+  const pending=cas.filter(c=>c.status==='pending').length;
+  if(Q('sadm-stats')) Q('sadm-stats').innerHTML=`<strong>System overview</strong><br/>
+    Lecturers: <strong>${lecs.length}</strong> · Sessions: <strong>${sessions.length}</strong> · 
+    Co-admins: <strong>${cas.filter(c=>c.status==='active').length}</strong> · UIDs issued: <strong>${DB.getUIDs().length.toLocaleString()}</strong>`;
+  // Notification dot
+  const dot=Q('cadm-notif');
+  if(dot) dot.style.display=pending>0?'inline-block':'none';
+}
+
+async function renderSAdmLecturers(){
+  const el=Q('sadm-lecturers-list'); if(!el)return;
+  const lecs=await DB.getLecturers();
+  if(!lecs.length){el.innerHTML='<div class="no-rec">No lecturers yet.</div>';return;}
+  el.innerHTML=lecs.map(l=>`
+    <div class="att-item">
+      <div class="att-dot" style="background:#ba7517"></div>
+      <span class="att-name">${esc(l.name)}</span>
+      <span style="font-family:monospace;font-size:12px;color:#534ab7;font-weight:600">${esc(l.lecId)}</span>
+      <span class="att-sid">${esc(l.email)}</span>
+      <span class="pill gray">${esc(l.department||'—')}</span>
+      <span class="pill blue">${esc(l.institution||'—')}</span>
+      <span class="att-time">${new Date(l.createdAt).toLocaleDateString()}</span>
+      <button class="btn btn-danger btn-sm" onclick="removeLec('${l.id}','${esc(l.name)}')">Remove</button>
+    </div>`).join('');
+}
+
+async function removeLec(id,name){
+  if(!confirm('Remove '+name+'?')) return;
+  await DB.deleteLec(id);
+  refreshSAdmData();
+}
+
+async function renderSAdmSessions(){
+  const el=Q('sadm-sessions-list'); if(!el)return;
+  const allSess=await DB.getAllSessions();
+  // Populate institution filter
+  const instSel=Q('sadm-sess-inst');
+  if(instSel&&instSel.options.length===1){
+    const insts=new Set(allSess.map(s=>s.institution).filter(Boolean));
+    [...insts].sort().forEach(i=>{const o=document.createElement('option');o.value=i;o.textContent=i;instSel.appendChild(o);});
+  }
+  const lecSel=Q('sadm-sess-lec');
+  if(lecSel&&lecSel.options.length===1){
+    const lecs=new Set(allSess.map(s=>s.lecturer).filter(Boolean));
+    [...lecs].sort().forEach(l=>{const o=document.createElement('option');o.value=l;o.textContent=l;lecSel.appendChild(o);});
+  }
+  const instF=Q('sadm-sess-inst')?.value||'all', lecF=Q('sadm-sess-lec')?.value||'all';
+  const filtered=allSess.filter(s=>(instF==='all'||s.institution===instF)&&(lecF==='all'||s.lecturer===lecF))
+    .sort((a,b)=>b.createdAt-a.createdAt);
+  if(!filtered.length){el.innerHTML='<div class="no-rec">No sessions yet.</div>';return;}
+  const parts=await Promise.all(filtered.slice(0,50).map(async s=>{
+    const recs=await DB.getRecords(s.id);
+    return `<div class="sess-card"><div class="sc-hdr"><div>
+      <div class="sc-title">${esc(s.code)} — ${esc(s.course)} <span class="pill ${s.active?'blue':'gray'}">${s.active?'active':'ended'}</span></div>
+      <div class="sc-meta">${esc(s.lecturer)} · ${esc(s.lecId)} · ${esc(s.institution||'—')} · ${esc(s.date)} · ${recs.length} present</div>
+    </div><div class="sc-actions"><button class="btn btn-secondary btn-sm" onclick="adminExportSessionCSV('${s.id}')">CSV</button></div></div>
+    ${recs.slice(0,5).map(r=>`<div class="rec-row"><span class="rec-name">${esc(r.name)}</span><span class="rec-sid">${esc(r.sid)}</span><span class="rec-time">${esc(r.time)}</span></div>`).join('')}
+    ${recs.length>5?`<div style="font-size:12px;color:#aaa;padding:4px 0">… and ${recs.length-5} more</div>`:''}
+    </div>`;
+  }));
+  el.innerHTML=parts.join('');
+  if(filtered.length>50) el.innerHTML+='<div style="font-size:12px;color:#aaa;padding:8px 0;text-align:center">Showing first 50. Use CSV export for all.</div>';
+}
+
+async function adminExportSessionCSV(id){
+  const s=await DB.getSession(id); if(!s) return;
+  const recs=await DB.getRecords(id), blk=await DB.getBlocked(id);
+  const rows=[['Name','Student ID','Device FP','Location','Time','Course Code','Course','Lecturer','Lecturer ID','Institution','Date','Session ID']];
+  recs.forEach(r=>rows.push([r.name,r.sid,r.fp,r.locNote||'',r.time,s.code,s.course,s.lecturer,s.lecId,s.institution||'',s.date,s.id]));
+  if(blk.length){rows.push([]);rows.push(['--- BLOCKED ---']);blk.forEach(b=>rows.push([b.name,b.sid,b.reason,b.time]));}
+  dlCSV(rows,`SESSION_${s.code}_${s.date}`);
+}
+
+async function exportSAdmSessionsCSV(){
+  const sessions=await DB.getAllSessions();
+  const instF=Q('sadm-sess-inst')?.value||'all', lecF=Q('sadm-sess-lec')?.value||'all';
+  const filtered=sessions.filter(s=>(instF==='all'||s.institution===instF)&&(lecF==='all'||s.lecturer===lecF));
+  const rows=[['Name','Student ID','Location','Time','Course','Lecturer','Lecturer ID','Institution','Date','Session ID']];
+  for(const s of filtered){
+    const recs=await DB.getRecords(s.id);
+    recs.forEach(r=>rows.push([r.name,r.sid,r.locNote||'',r.time,s.code,s.lecturer,s.lecId,s.institution||'',s.date,s.id]));
+  }
+  dlCSV(rows,'SADMIN_SESSIONS_ALL');
+}
+
+/* ── Super admin overall database ── */
+async function renderSAdmDB(){
+  const el=Q('sadm-db-list'); if(!el)return;
+  const sessions=await DB.getAllSessions();
+  const instF=Q('sadm-db-inst')?.value||'all', courseF=Q('sadm-db-course')?.value||'all';
+  // Populate filters
+  const instSel=Q('sadm-db-inst');
+  if(instSel&&instSel.options.length===1){
+    const insts=new Set(sessions.map(s=>s.institution).filter(Boolean));
+    [...insts].sort().forEach(i=>{const o=document.createElement('option');o.value=i;o.textContent=i;instSel.appendChild(o);});
+  }
+  const cSel=Q('sadm-db-course');
+  if(cSel&&cSel.options.length===1){
+    const codes=new Set(sessions.map(s=>s.code).filter(Boolean));
+    [...codes].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cSel.appendChild(o);});
+  }
+  const filtered=sessions.filter(s=>(instF==='all'||s.institution===instF)&&(courseF==='all'||s.code===courseF));
+  if(!filtered.length){el.innerHTML='<div class="no-rec">No data yet.</div>';return;}
+  // Group by institution → course → lecturer
+  const grouped={};
+  for(const s of filtered){
+    const inst=s.institution||'Unknown';
+    const course=s.code;
+    const key=`${inst}|${course}`;
+    if(!grouped[key]) grouped[key]={inst,course,courseName:s.course,lecturer:s.lecturer,sessions:[]};
+    grouped[key].sessions.push(s);
+  }
+  el.innerHTML='<div style="font-size:13px;color:#888;padding:8px 0 4px">'+Object.keys(grouped).length+' course groups shown. Use "Master Excel" to download all.</div>';
+  for(const [key,g] of Object.entries(grouped)){
+    const div=document.createElement('div');
+    div.className='sess-card';
+    div.innerHTML=`<div class="sc-hdr"><div>
+      <div class="sc-title">${esc(g.course)} — ${esc(g.courseName)}</div>
+      <div class="sc-meta">${esc(g.inst)} · ${esc(g.lecturer)} · ${g.sessions.length} sessions</div>
+    </div></div>`;
+    el.appendChild(div);
+  }
+}
+
+/* ── Co-admin views (dept-filtered) ── */
+async function renderCAdmLecturers(){
+  const el=Q('cadm-lecturers-list'); if(!el)return;
+  const all=await DB.getLecturers();
+  const myDept=A.coAdmin?.department, myInst=A.coAdmin?.institution;
+  const filtered=all.filter(l=>l.institution===myInst&&l.department===myDept);
+  if(!filtered.length){el.innerHTML='<div class="no-rec">No lecturers in your department yet.</div>';return;}
+  el.innerHTML=filtered.map(l=>`
+    <div class="att-item">
+      <div class="att-dot" style="background:#ba7517"></div>
+      <span class="att-name">${esc(l.name)}</span>
+      <span style="font-family:monospace;font-size:12px;color:#534ab7;font-weight:600">${esc(l.lecId)}</span>
+      <span class="att-sid">${esc(l.email)}</span>
+      <span class="att-time">${new Date(l.createdAt).toLocaleDateString()}</span>
+    </div>`).join('');
+}
+
+async function renderCAdmSessions(){
+  const el=Q('cadm-sessions-list'); if(!el)return;
+  const all=await DB.getAllSessions();
+  const myInst=A.coAdmin?.institution, myDept=A.coAdmin?.department;
+  // Find lecturers in this dept
+  const lecs=await DB.getLecturers();
+  const myLecIds=new Set(lecs.filter(l=>l.institution===myInst&&l.department===myDept).map(l=>l.id));
+  const filtered=all.filter(s=>myLecIds.has(s.lecFirebaseId)).sort((a,b)=>b.createdAt-a.createdAt);
+  if(!filtered.length){el.innerHTML='<div class="no-rec">No sessions in your department yet.</div>';return;}
+  const parts=await Promise.all(filtered.slice(0,30).map(async s=>{
+    const recs=await DB.getRecords(s.id);
+    return `<div class="sess-card"><div class="sc-hdr"><div>
+      <div class="sc-title">${esc(s.code)} — ${esc(s.course)}</div>
+      <div class="sc-meta">${esc(s.lecturer)} · ${esc(s.date)} · ${recs.length} present</div>
+    </div><div class="sc-actions"><button class="btn btn-secondary btn-sm" onclick="adminExportSessionCSV('${s.id}')">CSV</button></div></div>
+    ${recs.slice(0,3).map(r=>`<div class="rec-row"><span class="rec-name">${esc(r.name)}</span><span class="rec-sid">${esc(r.sid)}</span><span class="rec-time">${esc(r.time)}</span></div>`).join('')}
+    </div>`;
+  }));
+  el.innerHTML=parts.join('');
+}
+
+async function renderCAdmDB(){
+  const el=Q('cadm-db-list'); if(!el)return;
+  const all=await DB.getAllSessions();
+  const lecs=await DB.getLecturers();
+  const myInst=A.coAdmin?.institution, myDept=A.coAdmin?.department;
+  const myLecIds=new Set(lecs.filter(l=>l.institution===myInst&&l.department===myDept).map(l=>l.id));
+  // Populate lec filter
+  const lecSel=Q('cadm-db-lec');
+  if(lecSel&&lecSel.options.length===1){
+    const myLecs=lecs.filter(l=>l.institution===myInst&&l.department===myDept);
+    myLecs.forEach(l=>{const o=document.createElement('option');o.value=l.id;o.textContent=l.name;lecSel.appendChild(o);});
+  }
+  const lecF=Q('cadm-db-lec')?.value||'all';
+  const filtered=all.filter(s=>myLecIds.has(s.lecFirebaseId)&&(lecF==='all'||s.lecFirebaseId===lecF))
+    .sort((a,b)=>b.createdAt-a.createdAt);
+  if(!filtered.length){el.innerHTML='<div class="no-rec">No data yet.</div>';return;}
+  const courses={};
+  for(const s of filtered){
+    if(!courses[s.code]) courses[s.code]={code:s.code,name:s.course,sessions:[],lecs:new Set()};
+    courses[s.code].sessions.push(s); courses[s.code].lecs.add(s.lecturer);
+  }
+  el.innerHTML='<div style="font-size:13px;color:#888;padding:8px 0">'+Object.keys(courses).length+' courses. Use "Department Excel" for full data.</div>';
+  Object.values(courses).forEach(c=>{
+    const div=document.createElement('div');
+    div.className='sess-card';
+    div.innerHTML=`<div class="sc-hdr"><div>
+      <div class="sc-title">${esc(c.code)} — ${esc(c.name)}</div>
+      <div class="sc-meta">${c.sessions.length} sessions · Lecturers: ${[...c.lecs].map(esc).join(', ')}</div>
+    </div></div>`;
+    el.appendChild(div);
+  });
+}
+
+/* ── Co-admin management ── */
+async function renderSAdmCoAdmins(){
+  const el=Q('sadm-coadmins-list'), pSection=Q('pending-apps-section'), pList=Q('pending-apps-list');
+  const all=await DB.getCAs();
+  const pending=all.filter(c=>c.status==='pending');
+  const active=all.filter(c=>c.status==='active');
+  const dot=Q('cadm-notif'); if(dot) dot.style.display=pending.length>0?'inline-block':'none';
+  if(pSection){
+    pSection.style.display=pending.length?'block':'none';
+    if(pList) pList.innerHTML=pending.map(c=>`
+      <div class="appr-item">
+        <div class="appr-hdr">
+          <div><strong>${esc(c.name)}</strong> — ${esc(c.institution)} / ${esc(c.department)}<br/>
+          <span style="font-size:12px;color:#888">${esc(c.email)}</span></div>
+          <span style="font-size:11px;color:#aaa">${new Date(c.createdAt).toLocaleString()}</span>
+        </div>
+        <div class="appr-actions">
+          <button class="btn btn-teal btn-sm" onclick="approveCA('${c.id}')">✓ Approve</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectCA('${c.id}')">✗ Reject</button>
+        </div>
+      </div>`).join('');
+  }
+  if(el) el.innerHTML=active.length?active.map(c=>`
+    <div class="att-item">
+      <div class="att-dot" style="background:#ba7517"></div>
+      <span class="att-name">${esc(c.name)}</span>
+      <span class="att-sid">${esc(c.email)}</span>
+      <span class="pill amber">${esc(c.institution)}</span>
+      <span class="pill gray">${esc(c.department)}</span>
+      <span class="att-time">${new Date(c.createdAt).toLocaleDateString()}</span>
+      <button class="btn btn-danger btn-sm" onclick="revokeCA('${c.id}','${esc(c.name)}')">Revoke</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteCA('${c.id}','${esc(c.name)}')">Delete</button>
+    </div>`).join('')
+    :'<div class="no-rec">No active co-admins yet.</div>';
+}
+
+async function approveCA(id){
+  await DB.saveCA({...((await DB.getCAs()).find(c=>c.id===id)),status:'active'});
+  refreshSAdmData(); alert('Co-admin approved.');
+}
+async function rejectCA(id){
+  await DB.deleteCA(id); refreshSAdmData(); alert('Application rejected.');
+}
+async function revokeCA(id,name){
+  if(!confirm('Revoke '+name+'?')) return;
+  await DB.saveCA({...((await DB.getCAs()).find(c=>c.id===id)),status:'revoked'});
+  refreshSAdmData();
+}
+async function deleteCA(id,name){
+  if(!confirm('Permanently delete co-admin '+name+'?')) return;
+  await DB.deleteCA(id); refreshSAdmData();
+}
+
+function changeSAdmPw(){
+  const cur=Q('spw-cur')?.value, nw=Q('spw-new')?.value, nw2=Q('spw-new2')?.value;
+  clrAlert('spw-err'); clrAlert('spw-ok');
+  if(cur!==A.superAdmin?.pwHash&&cur!==A.superAdmin?.rawPw){
+    const sa=LS.superAdmin(); if(!sa||sa.pwHash!==hashPw(cur)) return setAlert('spw-err','Current password is incorrect.');
+  }
+  if(nw.length<8) return setAlert('spw-err','New password must be at least 8 characters.');
+  if(nw!==nw2)    return setAlert('spw-err','Passwords do not match.');
+  const sa=LS.superAdmin(); sa.pwHash=hashPw(nw); LS.saveSuperAdmin(sa); A.superAdmin=sa;
+  if(FB_READY) fbDb.ref('superAdmin/pwHash').set(hashPw(nw)).catch(()=>{});
+  setAlert('spw-ok','Password updated.','ok');
+  if(Q('spw-cur')) Q('spw-cur').value=''; if(Q('spw-new')) Q('spw-new').value=''; if(Q('spw-new2')) Q('spw-new2').value='';
+}
+
+async function resetAll(){
+  if(!confirm('⚠ Delete ALL data except the super admin account? This cannot be undone.')) return;
+  LS.saveLecturers([]); LS.saveSessions([]); LS.saveBackup({}); LS.saveUIDs([]); LS.saveCoAdmins([]);
+  Object.keys(localStorage).filter(k=>['rec_','blk_','dev_','sid_'].some(p=>k.startsWith('qratt_'+p))).forEach(k=>localStorage.removeItem(k));
+  if(FB_READY){
+    for(const path of['lecturers','sessions','backup','uids','coAdmins'])
+      await fbDb.ref(path).remove().catch(()=>{});
+  }
+  alert('All data reset.');
+  refreshSAdmData();
+}
+
+/* ══════════════════════════════════════
+   ADMIN TABS
+══════════════════════════════════════ */
+function sAdminTab(name){
+  document.querySelectorAll('#view-sadmin .tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  document.querySelectorAll('#view-sadmin .tab-page').forEach(p=>p.classList.toggle('active',p.id==='sadm-pg-'+name));
+  const fns={ids:()=>{renderUIDs();renderSAdmStats();},lecturers:renderSAdmLecturers,sessions:renderSAdmSessions,database:renderSAdmDB,coadmins:renderSAdmCoAdmins,settings:renderSAdmStats};
+  if(fns[name])fns[name]();
+}
+document.querySelectorAll('#view-sadmin .tab').forEach(t=>t.dataset.tab=t.textContent.trim().toLowerCase().replace(/\s+/g,'').replace('ids','ids').replace('coadmins','coadmins').replace('allsessions','sessions').replace('overalldatabase','database').replace(/[^a-z]/g,''));
+
+function cAdminTab(name){
+  document.querySelectorAll('#view-cadmin .tab').forEach(t=>t.classList.toggle('active',t.textContent.trim().toLowerCase().replace(/\s+/g,'').startsWith(name)));
+  document.querySelectorAll('#view-cadmin .tab-page').forEach(p=>p.classList.toggle('active',p.id==='cadm-pg-'+name));
+  const fns={ids:()=>{renderCAdmUIDs();},lecturers:renderCAdmLecturers,sessions:renderCAdmSessions,database:renderCAdmDB};
+  if(fns[name])fns[name]();
+}
+
+/* ══════════════════════════════════════
+   LECTURER AUTH
+══════════════════════════════════════ */
+async function lecSignup(){
+  const uid=Q('ls-uid').value.trim().toUpperCase();
+  const name=Q('ls-name').value.trim(), dept=Q('ls-dept').value.trim();
+  const inst=Q('ls-inst').value.trim(), email=Q('ls-email').value.trim().toLowerCase();
+  const pass=Q('ls-pass').value, pass2=Q('ls-pass2').value;
+  clrAlert('ls-alert');
+  if(!uid||!name||!dept||!inst||!email||!pass) return setAlert('ls-alert','All fields are required.');
+  if(pass.length<8) return setAlert('ls-alert','Password must be at least 8 characters.');
+  if(pass!==pass2)  return setAlert('ls-alert','Passwords do not match.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setAlert('ls-alert','Enter a valid email.');
+  btnLoading('ls-btn',true);
+  try{
+    // Validate UID
+    const claimed=validateAndClaimUID(uid);
+    if(!claimed){ btnLoading('ls-btn',false,'Create account'); return setAlert('ls-alert','Invalid, already used, or revoked Unique ID. Contact your admin.'); }
+    // Email uniqueness
+    const existing=await DB.getLecByEmail(email);
+    if(existing){ btnLoading('ls-btn',false,'Create account'); return setAlert('ls-alert','An account with this email already exists.'); }
+    const id=makeToken();
+    const lec={id,lecId:uid,name,email,department:dept,institution:inst,pwHash:hashPw(pass),createdAt:new Date().toISOString()};
+    await DB.saveLec(lec);
+    btnLoading('ls-btn',false,'Create account');
+    setAlert('ls-alert','Account created! Signing you in…','ok');
+    setTimeout(()=>activateLec(lec),1200);
+  }catch(e){ btnLoading('ls-btn',false,'Create account'); setAlert('ls-alert','Error: '+(e.message||e)); }
+}
+
+async function lecLogin(){
+  const email=Q('ll-email').value.trim().toLowerCase(), pass=Q('ll-pass').value;
+  clrAlert('ll-alert');
+  if(!email||!pass) return setAlert('ll-alert','Enter email and password.');
+  btnLoading('ll-btn',true);
+  try{
+    const lec=await DB.getLecByEmail(email);
+    if(!lec||lec.pwHash!==hashPw(pass)){ btnLoading('ll-btn',false,'Sign in'); return setAlert('ll-alert','Invalid email or password.'); }
+    btnLoading('ll-btn',false,'Sign in');
+    await activateLec(lec);
+  }catch(e){ btnLoading('ll-btn',false,'Sign in'); setAlert('ll-alert','Error: '+(e.message||e)); }
+}
+
+async function activateLec(lec){
+  A.lec=lec;
+  sessionStorage.setItem('qratt_lec',lec.email);
+  Q('lec-topbar-name').textContent=lec.name;
+  Q('l-lecname').value=lec.name;
+  Q('lecid-val').textContent=lec.lecId;
+  Q('s-fp').textContent=MY_FP;
+  goTo('lecturer');
+  resetLecForm();
+}
+
+function lecLogout(){
+  stopTimers(); A.lec=null; A.session=null;
+  sessionStorage.removeItem('qratt_lec'); goTo('landing');
+}
+
+function resetLecForm(){
+  Q('lec-setup').style.display='block'; Q('lec-active').style.display='none';
+  Q('qr-box').innerHTML=''; if(Q('l-blk-wrap')) Q('l-blk-wrap').style.display='none';
+  Q('l-code').value=''; Q('l-course').value='';
+  // Location fence stays ON (default true)
+  A.locOn=true; Q('loc-tog').classList.add('on'); Q('radius-row').style.display='block';
+}
+
+/* ── Lecturer tabs ── */
+function lecTab(name){
+  document.querySelectorAll('#view-lecturer .tab').forEach(t=>t.classList.toggle('active',t.textContent.trim().toLowerCase().startsWith(name)));
+  document.querySelectorAll('#view-lecturer .tab-page').forEach(p=>p.classList.toggle('active',p.id==='lec-pg-'+name));
+  if(name==='records') renderRecords();
+  if(name==='combined') renderCombined();
+}
+
+function toggleLoc(){
+  A.locOn=!A.locOn;
+  Q('loc-tog').classList.toggle('on',A.locOn);
+  Q('radius-row').style.display=A.locOn?'block':'none';
+}
+
+/* ══════════════════════════════════════
+   SESSION MANAGEMENT
+══════════════════════════════════════ */
+function startSession(){
+  const code=Q('l-code').value.trim().toUpperCase();
+  const course=Q('l-course').value.trim();
+  const lecName=Q('l-lecname').value.trim();
+  const mins=+Q('l-dur').value;
+  [['l-code',code],['l-course',course]].forEach(([id,v])=>Q(id).classList.toggle('err',!v));
+  if(!code||!course) return;
+  btnLoading('gen-btn',true);
+  if(A.locOn){
+    if(!navigator.geolocation){ buildSession(null,null,code,course,lecName,mins); return; }
+    navigator.geolocation.getCurrentPosition(
+      p=>buildSession(p.coords.latitude,p.coords.longitude,code,course,lecName,mins),
+      ()=>buildSession(null,null,code,course,lecName,mins),
+      {timeout:8000,maximumAge:60000}
+    );
+  } else {
+    buildSession(null,null,code,course,lecName,mins);
+  }
+}
+
+async function buildSession(lat,lng,code,course,lecName,mins){
+  try{
+    const token=makeToken(), radius=A.locOn?+Q('l-radius').value:null, date=todayStr();
+    A.session={
+      id:token.slice(0,10), token, code, course, lecturer:lecName,
+      lecId:A.lec?.lecId||'', lecFirebaseId:A.lec?.id||'',
+      institution:A.lec?.institution||'', department:A.lec?.department||'',
+      date, expiresAt:Date.now()+mins*60000, mins,
+      lat:lat||null, lng:lng||null, radius:radius||null,
+      createdAt:Date.now(), active:true
+    };
+    await DB.saveSession(A.session);
+    Q('l-si-code').textContent=code; Q('l-si-course').textContent=course;
+    Q('l-si-lec').textContent=lecName; Q('l-si-date').textContent=date;
+    Q('l-si-lecid').textContent=A.lec?.lecId||'—'; Q('l-si-id').textContent=A.session.id;
+    Q('l-si-dur').textContent=fmtDur(mins);
+    Q('sec-pills').innerHTML=[
+      {label:'1 device/sign-in',on:true},{label:'Unique Student ID',on:true},
+      {label:'Location fence',on:A.locOn},{label:'Time-limited QR',on:true},
+    ].map(p=>`<span class="spill ${p.on?'on':'off'}">${p.on?'✓':'–'} ${p.label}</span>`).join('');
+    const lc=Q('l-loc-card');
+    if(A.locOn&&lat){
+      lc.className='strip teal'; Q('l-lfc-title').textContent=`Location fence active — within ${radius}m`;
+      Q('l-lfc-detail').textContent=`Anchor: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    } else if(A.locOn&&!lat){
+      lc.className='strip amber'; Q('l-lfc-title').textContent='Location fence on but GPS unavailable';
+      Q('l-lfc-detail').textContent='Students will not be location-checked this session.';
+    } else {
+      lc.className='strip gray'; Q('l-lfc-title').textContent='Location check disabled';
+      Q('l-lfc-detail').textContent='';
+    }
+    Q('qr-box').innerHTML=''; Q('qr-box').style.opacity='1';
+    const payload=b64e(JSON.stringify({
+      id:A.session.id,token:A.session.token,code,course,date,
+      expiresAt:A.session.expiresAt,lat:lat||null,lng:lng||null,radius:radius||null
+    }));
+    const qrUrl=location.origin+location.pathname+'?ci='+payload;
+    new QRCode(Q('qr-box'),{text:qrUrl,width:220,height:220,colorDark:'#1a1a18',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+    Q('lec-setup').style.display='none'; Q('lec-active').style.display='block'; Q('csv-btn').style.display='none';
+    btnLoading('gen-btn',false,'Generate QR code');
+    stopTimers();
+    A.fbUnsubRec=DB.listenRecords(A.session.id,recs=>{renderLiveAtt(recs);if(recs.length>0)Q('csv-btn').style.display='inline-block';});
+    A.fbUnsubBlk=DB.listenBlocked(A.session.id,renderLiveBlk);
+    lecTick(); A.tickTimer=setInterval(lecTick,1000);
+  }catch(e){ btnLoading('gen-btn',false,'Generate QR code'); alert('Error: '+(e.message||e)); }
+}
+
+function stopTimers(){
+  clearInterval(A.tickTimer); A.tickTimer=null;
+  if(A.fbUnsubRec){A.fbUnsubRec();A.fbUnsubRec=null;}
+  if(A.fbUnsubBlk){A.fbUnsubBlk();A.fbUnsubBlk=null;}
+}
+
+function lecTick(){
+  if(!A.session)return;
+  const rem=Math.max(0,A.session.expiresAt-Date.now()), el=Q('l-cd');
+  if(rem===0){el.textContent='Session expired';el.className='countdown exp';Q('qr-box').style.opacity='0.3';clearInterval(A.tickTimer);markEnded();return;}
+  const h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000),s=Math.floor((rem%60000)/1000);
+  el.textContent=`Expires in ${h>0?h+'h '+pad(m)+'m '+pad(s)+'s':m+':'+pad(s)}`;
+  el.className='countdown '+(rem<180000?'warn':'ok');
+}
+
+function renderLiveAtt(records){
+  if(!Array.isArray(records))records=[];
+  Q('l-att-count').textContent=records.length;
+  Q('l-att-list').innerHTML=records.length
+    ?records.map(r=>`<div class="att-item"><div class="att-dot"></div><span class="att-name">${esc(r.name)}</span><span class="att-sid">${esc(r.sid)}</span><span class="pill gray" title="${esc(r.fp)}">📱${esc(r.fp)}</span>${r.locNote?`<span class="pill green">📍${esc(r.locNote)}</span>`:''}<span class="att-time">${esc(r.time)}</span></div>`).join('')
+    :'<div class="att-empty">Waiting for students…</div>';
+}
+
+function renderLiveBlk(blocked){
+  if(!Array.isArray(blocked))blocked=[];
+  const w=Q('l-blk-wrap'); if(!w)return;
+  if(!blocked.length){w.style.display='none';return;}
+  w.style.display='block'; Q('l-blk-count').textContent=blocked.length;
+  Q('l-blk-list').innerHTML=blocked.map(b=>`<div class="blk-item"><span><strong>${esc(b.name)}</strong> (${esc(b.sid)}) — ${esc(b.reason)}</span><span style="color:#aaa;white-space:nowrap">${esc(b.time)}</span></div>`).join('');
+}
+
+async function markEnded(){
+  if(!A.session)return;
+  A.session.active=false;
+  await DB.updateSession(A.session.id,{active:false,endedAt:Date.now()});
+  const records=await DB.getRecords(A.session.id), blocked=await DB.getBlocked(A.session.id);
+  await DB.saveBackup(A.session,records,blocked);
+}
+
+async function endSession(){
+  if(!confirm('End this session and save all records?'))return;
+  stopTimers(); await markEnded(); A.session=null;
+  Q('lec-active').style.display='none'; Q('lec-setup').style.display='block';
+  Q('qr-box').innerHTML=''; if(Q('l-blk-wrap')) Q('l-blk-wrap').style.display='none';
+}
+
+function downloadQR(){
+  const canvas=Q('qr-box').querySelector('canvas'), img=Q('qr-box').querySelector('img');
+  const a=document.createElement('a');
+  if(canvas) a.href=canvas.toDataURL('image/png');
+  else if(img) a.href=img.src;
+  else{alert('QR not ready.');return;}
+  a.download=`QR_${A.session?.code||'code'}_${A.session?.date||''}.png`; a.click();
+}
+
+/* ══════════════════════════════════════
+   LECTURER RECORDS & COMBINED REPORTS
+══════════════════════════════════════ */
+async function renderRecords(){
+  const el=Q('records-list'); el.innerHTML='<div class="att-empty">Loading…</div>';
+  const sessions=(await DB.getSessionsByLecId(A.lec?.id||'')).filter(s=>!s.deletedByLec).sort((a,b)=>b.createdAt-a.createdAt);
+  if(!sessions.length){el.innerHTML='<div class="no-rec">No sessions yet.</div>';return;}
+  const parts=await Promise.all(sessions.map(async s=>{
+    const recs=await DB.getRecords(s.id);
+    const sp=s.active?'<span class="pill blue">active</span>':'<span class="pill gray">ended</span>';
+    return `<div class="sess-card"><div class="sc-hdr"><div><div class="sc-title">${esc(s.code)} — ${esc(s.course)} ${sp}</div><div class="sc-meta">${esc(s.date)} · ${recs.length} present · ID: ${esc(s.id)}</div></div>
+      <div class="sc-actions"><button class="btn btn-secondary btn-sm" onclick="exportSessionCSV('${s.id}')">CSV</button><button class="btn btn-danger btn-sm" onclick="delSessRec('${s.id}')">Del</button></div></div>
+      ${recs.map(r=>`<div class="rec-row"><span class="rec-name">${esc(r.name)}</span><span class="rec-sid">${esc(r.sid)}</span>${r.locNote?`<span class="pill green" style="font-size:10px">📍${esc(r.locNote)}</span>`:''}<span class="rec-time">${esc(r.time)}</span></div>`).join('')||'<div style="font-size:12px;color:#aaa;padding:5px 0">No records</div>'}
+    </div>`;
+  }));
+  el.innerHTML=parts.join('');
+}
+
+async function delSessRec(id){ if(!confirm('Delete from your view? Admin backup preserved.'))return; await DB.updateSession(id,{deletedByLec:true}); renderRecords(); }
+
+async function exportSessionCSV(id){
+  const allS=await DB.getSessionsByLecId(A.lec?.id||''); const s=allS.find(x=>x.id===id)||await DB.getSession(id); if(!s)return;
+  const recs=await DB.getRecords(id), blk=await DB.getBlocked(id);
+  if(!recs.length){alert('No records to export.');return;}
+  const rows=[['Name','Student ID','Device FP','Location','Time','Course Code','Course','Lecturer','Lecturer ID','Institution','Date','Session ID']];
+  recs.forEach(r=>rows.push([r.name,r.sid,r.fp,r.locNote||'',r.time,s.code,s.course,s.lecturer,s.lecId,s.institution||'',s.date,s.id]));
+  if(blk.length){rows.push([]);rows.push(['--- BLOCKED ---']);blk.forEach(b=>rows.push([b.name,b.sid,b.reason,b.time]));}
+  dlCSV(rows,`ATT_${s.code}_${s.date}_${s.id}`);
+}
+
+/* ══════════════════════════════════════
+   COMBINED REPORTS + EXCEL EXPORT
+   Excel file 1: All attendance per course (every session)
+   Excel file 2: Frequency per student ID per course
+══════════════════════════════════════ */
+async function renderCombined(){
+  const el=Q('combined-list'); el.innerHTML='<div class="att-empty">Loading…</div>';
+  const sessions=(await DB.getSessionsByLecId(A.lec?.id||'')).filter(s=>!s.deletedByLec);
+  if(!sessions.length){el.innerHTML='<div class="no-rec">No sessions yet.</div>';return;}
+  const courses={};
+  for(const s of sessions){
+    if(!courses[s.code]) courses[s.code]={code:s.code,name:s.course,sessions:[]};
+    courses[s.code].sessions.push({...s,records:await DB.getRecords(s.id)});
+  }
+  el.innerHTML=Object.values(courses).map(c=>{
+    const total=c.sessions.reduce((n,s)=>n+s.records.length,0);
+    const rows=c.sessions.map(s=>`<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:500;color:#666;margin-bottom:3px">${esc(s.date)} — ${s.records.length} present</div>${s.records.map(r=>`<div class="rec-row"><span class="rec-name">${esc(r.name)}</span><span class="rec-sid">${esc(r.sid)}</span><span class="rec-time">${esc(r.time)}</span></div>`).join('')||'<div style="font-size:12px;color:#aaa">No records</div>'}</div>`).join('');
+    return `<div class="sess-card"><div class="sc-hdr"><div><div class="sc-title">${esc(c.code)} — ${esc(c.name)}</div><div class="sc-meta">${c.sessions.length} sessions · ${total} total sign-ins</div></div>
+      <div class="sc-actions">
+        <button class="btn btn-primary btn-sm" onclick="exportCourseExcel('${esc(c.code)}')">⬇ Excel</button>
+        <button class="btn btn-secondary btn-sm" onclick="exportCourseCSV('${esc(c.code)}')">⬇ CSV</button>
+      </div></div>${rows}</div>`;
+  }).join('');
+}
+
+async function exportCourseExcel(code){
+  const sessions=(await DB.getSessionsByLecId(A.lec?.id||'')).filter(s=>s.code===code&&!s.deletedByLec);
+  if(!sessions.length){alert('No sessions for this course.');return;}
+
+  const wb=XLSX.utils.book_new();
+
+  /* Sheet 1: Full attendance list */
+  const rows1=[['Session Date','Session ID','Student Name','Student ID','Check-in Time','Location','Course Code','Course Name','Lecturer','Lecturer ID']];
+  for(const s of sessions){
+    const recs=await DB.getRecords(s.id);
+    if(!recs.length) rows1.push([s.date,s.id,'(no check-ins)','','','',s.code,s.course,s.lecturer,s.lecId]);
+    else recs.forEach(r=>rows1.push([s.date,s.id,r.name,r.sid,r.time,r.locNote||'N/A',s.code,s.course,s.lecturer,s.lecId]));
+  }
+  const ws1=XLSX.utils.aoa_to_sheet(rows1);
+  styleExcelSheet(ws1,rows1[0].length);
+  XLSX.utils.book_append_sheet(wb,ws1,'Attendance List');
+
+  /* Sheet 2: Frequency — times each student ID attended */
+  const freq={};
+  for(const s of sessions){
+    const recs=await DB.getRecords(s.id);
+    recs.forEach(r=>{
+      const k=r.sid.toUpperCase().trim();
+      if(!freq[k]) freq[k]={sid:r.sid,name:r.name,count:0,sessions:[]};
+      freq[k].count++;
+      freq[k].sessions.push(s.date);
+    });
+  }
+  const rows2=[['Student ID','Student Name','Sessions Attended','Total Sessions','Attendance %','Session Dates']];
+  Object.values(freq).sort((a,b)=>b.count-a.count).forEach(f=>{
+    rows2.push([f.sid,f.name,f.count,sessions.length,Math.round(f.count/sessions.length*100)+'%',f.sessions.join(', ')]);
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(rows2);
+  styleExcelSheet(ws2,rows2[0].length);
+  XLSX.utils.book_append_sheet(wb,ws2,'Attendance Frequency');
+
+  XLSX.writeFile(wb,`ATT_${code}_${A.lec?.lecId||''}.xlsx`);
+}
+
+async function exportCourseCSV(code){
+  const sessions=(await DB.getSessionsByLecId(A.lec?.id||'')).filter(s=>s.code===code&&!s.deletedByLec);
+  const rows=[['Session Date','Student Name','Student ID','Time','Location','Course Code','Course','Lecturer','Lecturer ID']];
+  for(const s of sessions){
+    const recs=await DB.getRecords(s.id);
+    recs.length?recs.forEach(r=>rows.push([s.date,r.name,r.sid,r.time,r.locNote||'',s.code,s.course,s.lecturer,s.lecId]))
+               :rows.push([s.date,'(no check-ins)','','','',s.code,s.course,s.lecturer,s.lecId]);
+    rows.push([]);
+  }
+  dlCSV(rows,`ATT_${code}_${A.lec?.lecId||''}`);
+}
+
+/* ── Master Excel for admin/co-admin ── */
+async function exportMasterExcel(role){
+  const sessions=await getMySessions(role);
+  if(!sessions.length){alert('No sessions to export.');return;}
+  const wb=XLSX.utils.book_new();
+  const courses={};
+  for(const s of sessions){
+    const recs=await DB.getRecords(s.id);
+    if(!courses[s.code]) courses[s.code]={code:s.code,name:s.course,rows:[['Date','Session ID','Student Name','Student ID','Time','Location','Lecturer','Lecturer ID','Institution','Department']]};
+    recs.forEach(r=>courses[s.code].rows.push([s.date,s.id,r.name,r.sid,r.time,r.locNote||'',s.lecturer,s.lecId,s.institution||'',s.department||'']));
+    if(!recs.length) courses[s.code].rows.push([s.date,s.id,'(no check-ins)','','','',s.lecturer,s.lecId,s.institution||'',s.department||'']);
+  }
+  Object.values(courses).forEach(c=>{
+    const ws=XLSX.utils.aoa_to_sheet(c.rows);
+    styleExcelSheet(ws,c.rows[0].length);
+    XLSX.utils.book_append_sheet(wb,ws,c.code.slice(0,31)); // Excel sheet name limit
+  });
+  const fname=role==='sadm'?`MASTER_ALL_${todayStr()}.xlsx`:`DEPT_${A.coAdmin?.department||''}_${todayStr()}.xlsx`;
+  XLSX.writeFile(wb,fname);
+}
+
+async function exportMasterCSV(role){
+  const sessions=await getMySessions(role);
+  const rows=[['Date','Course Code','Course','Student Name','Student ID','Time','Location','Lecturer','Lecturer ID','Institution','Department']];
+  for(const s of sessions){
+    const recs=await DB.getRecords(s.id);
+    recs.forEach(r=>rows.push([s.date,s.code,s.course,r.name,r.sid,r.time,r.locNote||'',s.lecturer,s.lecId,s.institution||'',s.department||'']));
+  }
+  dlCSV(rows,role==='sadm'?'MASTER_ALL':(`DEPT_${A.coAdmin?.department||''}`));
+}
+
+async function getMySessions(role){
+  const all=await DB.getAllSessions();
+  if(role==='sadm'){
+    const instF=Q('sadm-db-inst')?.value||'all', courseF=Q('sadm-db-course')?.value||'all';
+    return all.filter(s=>(instF==='all'||s.institution===instF)&&(courseF==='all'||s.code===courseF));
+  }
+  if(role==='cadm'){
+    const lecs=await DB.getLecturers();
+    const myInst=A.coAdmin?.institution, myDept=A.coAdmin?.department;
+    const myLecIds=new Set(lecs.filter(l=>l.institution===myInst&&l.department===myDept).map(l=>l.id));
+    const lecF=Q('cadm-db-lec')?.value||'all';
+    return all.filter(s=>myLecIds.has(s.lecFirebaseId)&&(lecF==='all'||s.lecFirebaseId===lecF));
+  }
+  return all;
+}
+
+function styleExcelSheet(ws,cols){
+  const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+  const colWidths=[]; for(let c=0;c<=range.e.c;c++) colWidths.push({wch:20});
+  ws['!cols']=colWidths;
+}
+
+/* ══════════════════════════════════════
+   STUDENT CHECK-IN
+══════════════════════════════════════ */
+function showStuState(state,title,msg){
+  ['loading','invalid','done'].forEach(n=>Q('stu-'+n)?.classList.remove('show'));
+  if(Q('stu-form')) Q('stu-form').style.display='none';
+  if(state==='invalid'){Q('stu-invalid').classList.add('show');if(title)Q('inv-title').textContent=title;if(msg)Q('inv-msg').textContent=msg;}
+  else if(state==='done'){Q('stu-done').classList.add('show');if(msg)Q('done-msg').textContent=msg;clearInterval(A.stuCdTimer);A.stuCdTimer=null;}
+}
+
+async function initStuCheckin(ciParam){
+  try{
+    const data=JSON.parse(b64d(decodeURIComponent(ciParam)));
+    Q('stu-loading').classList.remove('show');
+    if(!data?.id||!data?.token){showStuState('invalid','Invalid QR code','Malformed QR. Ask your lecturer for a new one.');return;}
+    if(Date.now()>data.expiresAt){showStuState('invalid','Session expired',`The sign-in window for ${data.code} has closed.`);return;}
+    A.stuSession=data;
+    if(await DB.isDeviceUsed(data.id,MY_FP)){
+      const recs=await DB.getRecords(data.id); const who=recs.find(r=>r.fp===MY_FP);
+      showStuState('done',null,`Your attendance for ${data.code} has already been recorded${who?' as '+who.name:''}.`); return;
+    }
+    Q('s-code').textContent=data.code; Q('s-course').textContent=data.course; Q('s-date').textContent=data.date;
+    Q('s-fp').textContent=MY_FP; Q('stu-form').style.display='block';
+    if(data.lat!=null){Q('loc-btn-row').style.display='flex';Q('no-loc-row').style.display='none';}
+    else {Q('ls-text').textContent='Location not required for this session'; Q('ls-box').className='loc-status idle';}
+    stuCdTick(); clearInterval(A.stuCdTimer); A.stuCdTimer=setInterval(stuCdTick,1000);
+  }catch(e){
+    console.error(e); Q('stu-loading').classList.remove('show');
+    showStuState('invalid','Could not read QR code','Please scan again or ask your lecturer for a new one.');
+  }
+}
+
+function stuCdTick(){
+  if(!A.stuSession)return;
+  const rem=Math.max(0,A.stuSession.expiresAt-Date.now()), el=Q('s-cd');
+  if(!el)return;
+  if(rem===0){el.textContent='Session expired';el.className='countdown exp';clearInterval(A.stuCdTimer);A.stuCdTimer=null;showStuState('invalid','Session expired','The sign-in window has closed.');return;}
+  const h=Math.floor(rem/3600000),m=Math.floor((rem%3600000)/60000),s=Math.floor((rem%60000)/1000);
+  el.textContent=h>0?`${h}h ${pad(m)}m ${pad(s)}s left`:`${m}:${pad(s)} left`;
+  el.className='countdown '+(rem<180000?'warn':'ok');
+}
+
+function getStudentLoc(){
+  setLS('busy','Fetching your location…');
+  if(!navigator.geolocation){simLoc();return;}
+  navigator.geolocation.getCurrentPosition(
+    p=>{A.stuLat=p.coords.latitude;A.stuLng=p.coords.longitude;setLS('ok',`Location acquired: ${A.stuLat.toFixed(5)}, ${A.stuLng.toFixed(5)}`);},
+    ()=>simLoc(),{timeout:8000,maximumAge:30000}
+  );
+}
+function simLoc(){
+  const inside=Math.random()>0.3, base=A.stuSession?.lat?[A.stuSession.lat,A.stuSession.lng]:[5.6505,-0.1875];
+  const d=inside?0.0004:0.0035;
+  A.stuLat=base[0]+(Math.random()-.5)*d*2; A.stuLng=base[1]+(Math.random()-.5)*d*2;
+  setLS('ok',`Location acquired: ${A.stuLat.toFixed(5)}, ${A.stuLng.toFixed(5)}`);
+}
+function setLS(cls,msg){ const b=Q('ls-box');if(!b)return;b.className='loc-status '+cls;Q('ls-text').textContent=msg; }
+
+async function checkIn(){
+  const nameEl=Q('s-name'),sidEl=Q('s-sid');
+  const name=nameEl.value.trim(),sid=sidEl.value.trim();
+  nameEl.classList.remove('err');sidEl.classList.remove('err');
+  Q('res-ok').classList.remove('show');Q('res-err').classList.remove('show');
+  if(!name){nameEl.classList.add('err');showStuErr('Please enter your full name.');return;}
+  if(!sid){sidEl.classList.add('err');showStuErr('Student ID is required.');return;}
+  if(!A.stuSession){showStuErr('No session loaded. Please scan the QR code again.');return;}
+  if(Date.now()>A.stuSession.expiresAt){showStuErr('This session has expired.');return;}
+  ['ci-btn','ci-btn-loc'].forEach(id=>{const b=Q(id);if(b){b.disabled=true;b.innerHTML='<span class="spin"></span>Checking in…';}});
+  const id=A.stuSession.id, normSid=sid.toUpperCase().trim();
+  try{
+    if(await DB.isDeviceUsed(id,MY_FP)){
+      const who=(await DB.getRecords(id)).find(r=>r.fp===MY_FP);
+      await DB.pushBlocked(id,{name,sid,reason:`Device used by ${who?who.name:'another student'}`,time:nowTime()});
+      showStuErr(`This device already checked in${who?' by '+who.name:''}. One device per session.`);resetCiBtn();return;
+    }
+    if(await DB.isSidUsed(id,normSid)){
+      const who=(await DB.getRecords(id)).find(r=>r.sid.toUpperCase()===normSid);
+      await DB.pushBlocked(id,{name,sid,reason:`ID used by ${who?who.name:'another'}`,time:nowTime()});
+      sidEl.classList.add('err');showStuErr(`Student ID "${sid}" already registered${who?' under '+who.name:''}.`);resetCiBtn();return;
+    }
+    const existing=await DB.getRecords(id);
+    if(existing.find(r=>r.name.toLowerCase()===name.toLowerCase())){
+      await DB.pushBlocked(id,{name,sid,reason:'Name already checked in',time:nowTime()});
+      showStuErr(`${name} has already checked in.`);resetCiBtn();return;
+    }
+    let locNote='';
+    if(A.stuSession.lat!=null){
+      if(A.stuLat===null){showStuErr('Location required — tap "Get my location" first.');resetCiBtn();return;}
+      const dist=haversine(A.stuLat,A.stuLng,A.stuSession.lat,A.stuSession.lng);
+      if(dist>A.stuSession.radius){
+        await DB.pushBlocked(id,{name,sid,reason:`Too far — ${dist}m (limit ${A.stuSession.radius}m)`,time:nowTime()});
+        showStuErr(`You are ${dist}m away. Must be within ${A.stuSession.radius}m.`);resetCiBtn();return;
+      }
+      locNote=`${dist}m`;
+    }
+    await DB.addDevice(id,MY_FP); await DB.addSid(id,normSid);
+    await DB.pushRecord(id,{name,sid,fp:MY_FP,time:nowTime(),locNote});
+    showStuState('done',null,`Attendance for ${A.stuSession.code} — ${A.stuSession.course} on ${A.stuSession.date} recorded.`);
+  }catch(e){ showStuErr('Error: '+(e.message||e)); resetCiBtn(); }
+}
+
+function resetCiBtn(){['ci-btn','ci-btn-loc'].forEach(id=>{const b=Q(id);if(b){b.disabled=false;b.textContent='Check in';}});}
+function showStuErr(msg){const el=Q('res-err');el.innerHTML=`<strong>✗ Check-in failed</strong><br>${esc(msg)}`;el.classList.add('show');}
+
+/* ══════════════════════════════════════
+   UTILITIES
+══════════════════════════════════════ */
+function Q(id){ return document.getElementById(id); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function makeToken(){ return Array.from(crypto.getRandomValues(new Uint8Array(10))).map(b=>b.toString(36)).join('').toUpperCase().slice(0,12); }
+function fmtDur(m){ if(m<60)return m+' min'; const h=Math.floor(m/60),r=m%60; return r?`${h}h ${r}min`:`${h}h`; }
+function todayStr(){ return new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function nowTime(){ return new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+function hashPw(pw){ let h=0x811c9dc5; for(let i=0;i<pw.length;i++){h^=pw.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;} return h.toString(16).padStart(8,'0'); }
+function haversine(a,b,c,d){ const R=6371000,dL=(c-a)*Math.PI/180,dG=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dG/2)**2; return Math.round(R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))); }
+function b64e(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); }
+function b64d(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; return decodeURIComponent(escape(atob(s))); }
+function tgEye(id,btn){ const el=Q(id);if(!el)return;el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'👁':'🙈'; }
+function setAlert(id,msg,type='err'){ const el=Q(id);if(!el)return;el.textContent=msg;el.className=`alert ${type} show`; }
+function clrAlert(id){ const el=Q(id);if(el)el.className='alert'; }
+function btnLoading(id,on,label){ const b=Q(id);if(!b)return;b.disabled=on;b.innerHTML=on?'<span class="spin"></span>Please wait…':label||b.dataset.orig||b.textContent;if(!on&&label)b.dataset.orig=label; }
+function dlCSV(rows,name){ const csv=rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n'); const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=name.replace(/[^a-zA-Z0-9_-]/g,'_')+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+
+/* Device fingerprint */
+const MY_FP=(()=>{
+  const raw=[navigator.userAgent,navigator.language,screen.width+'x'+screen.height+'x'+screen.colorDepth,Intl.DateTimeFormat().resolvedOptions().timeZone,navigator.hardwareConcurrency||0,navigator.platform||'',navigator.vendor||''].join('||');
+  let h=0x811c9dc5;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0;}return h.toString(16).toUpperCase().padStart(8,'0');
+})();
+
+/* ══════════════════════════════════════
+   BOOT
+══════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', async()=>{
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  window.addEventListener('online',()=>{Q('offline-bar').classList.remove('show');processQueue();});
+  window.addEventListener('offline',()=>Q('offline-bar').classList.add('show'));
+  if(!navigator.onLine) Q('offline-bar').classList.add('show');
+  if(!FB_READY) Q('demo-bar').classList.add('show');
+
+  const params=new URLSearchParams(location.search), ci=params.get('ci');
+  if(ci){ goTo('stu-checkin'); await initStuCheckin(ci); return; }
+
+  const savedEmail=sessionStorage.getItem('qratt_lec');
+  if(savedEmail){ const lec=await DB.getLecByEmail(savedEmail).catch(()=>null); if(lec){await activateLec(lec);return;} }
+
+  goTo('landing');
+});
+
+function goTo(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  const el=Q('view-'+view); if(el) el.classList.add('active'); window.scrollTo(0,0);
+  // When navigating to admin login, check if super admin needs setup
+  if(view==='admin-login') checkAdminSetup();
+}
+
+// Init tab data-tab attributes by text
+document.querySelectorAll('#view-sadmin .tab').forEach(t=>{
+  const map={'Unique IDs':'ids','Lecturers':'lecturers','All Sessions':'sessions','Overall Database':'database','Co-Admins':'coadmins','Settings':'settings'};
+  const txt=t.textContent.replace(/[^\w\s]/g,'').trim();
+  for(const[k,v] of Object.entries(map)){ if(txt.includes(k.replace(/\W/g,''))||k.includes(txt.slice(0,5))){ t.dataset.tab=v; break; } }
+  if(!t.dataset.tab) t.dataset.tab=txt.toLowerCase().replace(/\s+/g,'').slice(0,10);
+});
+  </script>
+</body>
+</html>
